@@ -1,0 +1,17 @@
+# Antigravity Auto-Clicker — Dependencies
+# ========================================
+# Core (required)
+pyautogui>=0.9.54
+pywin32>=227
+Pillow>=10.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Optional: OCR button detection (requires Tesseract installed)
+pytesseract>=0.3.10
+
+# Optional: Desktop toast notifications
+win10toast>=0.9; platform_system=="Windows"
+
+# Optional: System tray integration
+pystray>=0.19.0
