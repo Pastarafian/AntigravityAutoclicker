@@ -352,8 +352,8 @@ function ClickerPage({ scanner, setScanner, killActive, showNotification, pollPa
         </button>
       </div>
 
-      {/* Scanner Readings */}
-      {scanner?.running && (
+      {/* Scanner Readings — always visible to prevent flicker */}
+      {scanner && (
         <div className="settings-section" style={{ marginBottom: 16 }}>
           <h3>📊 Scanner Readings</h3>
           <label>
@@ -487,7 +487,7 @@ function AgentPage({ agent, chat, killActive, showNotification }: {
         <div className="llm-info">
           <span className={`llm-dot ${agent?.llm?.available ? 'on' : 'off'}`} />
           <strong>{agent?.llm?.provider_name || 'Unknown'}</strong>
-          <span className="llm-model">{agent?.llm?.modeml}</span>
+          <span className="llm-model">{agent?.llm?.model}</span>
         </div>
         <div className="llm-stats">
           <span>🪙 {agent?.llm?.total_tokens || 0} tokens</span>
