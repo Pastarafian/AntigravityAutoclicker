@@ -1651,6 +1651,7 @@ class ScanEngine:
         self._last_toast_time = 0.0  # Rate-limit toast notifications
         self._last_bottom_hash = None  # For scroll-change detection
         self._last_scroll_time = 0.0  # Rate-limit scroll operations
+        self._last_focused_hwnd = None  # Track which IDE window we auto-focused
 
     def start(self):
         if self.running:
@@ -1658,6 +1659,7 @@ class ScanEngine:
         self.settings = load_settings()
         self.running = True
         self.paused = False
+        self._last_focused_hwnd = None  # Reset so IDE gets auto-focused on start
         self.stop_event.clear()
         self.thread = threading.Thread(target=self._scan_loop, daemon=True)
         self.thread.start()
@@ -1885,15 +1887,19 @@ class ScanEngine:
         try:
             # === SAVE STATE ===
             orig_hwnd = win32gui.GetForegroundWindow()
+            orig_title = win32gui.GetWindowText(orig_hwnd)[:40] if orig_hwnd else 'None'
             orig_x, orig_y = win32api.GetCursorPos()
+            self.log(f"Click: save state — FG={orig_title} cursor=({orig_x},{orig_y})", "info")
 
             # === ACTIVATE TARGET WINDOW (if needed) ===
-            if hwnd and hwnd != orig_hwnd:
+            needs_focus_change = hwnd and hwnd != orig_hwnd
+            if needs_focus_change:
                 try:
-                    self._activate_window(hwnd)
-                    time.sleep(0.03)  # Brief settle time
-                except Exception:
-                    pass
+                    ok = self._activate_window(hwnd)
+                    self.log(f"Click: activate IDE hwnd={hwnd} — {'OK' if ok else 'FAIL'}", "info")
+                    time.sleep(0.05)  # Brief settle time
+                except Exception as e:
+                    self.log(f"Click: activate IDE EXCEPTION: {e}", "error")
 
             # === CLICK (atomic: move → down → up) ===
             sendinput_click(screen_x, screen_y, hold_ms=30)
@@ -1904,11 +1910,12 @@ class ScanEngine:
             restore_mouse(orig_x, orig_y)
 
             # Refocus original window (only if we changed focus)
-            if hwnd and hwnd != orig_hwnd and orig_hwnd:
+            if needs_focus_change and orig_hwnd:
                 try:
-                    self._activate_window(orig_hwnd)
-                except Exception:
-                    pass
+                    ok = self._activate_window(orig_hwnd)
+                    self.log(f"Click: restore FG={orig_title} — {'OK' if ok else 'FAIL'}", "info")
+                except Exception as e:
+                    self.log(f"Click: restore EXCEPTION: {e}", "error")
 
             self._record_click(detection.btn_type)
             self.log(
@@ -1947,7 +1954,12 @@ class ScanEngine:
         try:
             # Check if window still exists
             if not win32gui.IsWindow(hwnd):
+                logging.debug(f"_activate_window: hwnd={hwnd} no longer valid")
                 return False
+
+            # Restore from minimized state if needed
+            if win32gui.IsIconic(hwnd):
+                win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
 
             target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
             curr_thread = win32api.GetCurrentThreadId()
@@ -1964,7 +1976,11 @@ class ScanEngine:
                         ctypes.windll.user32.AttachThreadInput(curr_thread, target_thread, False)
             else:
                 win32gui.SetForegroundWindow(hwnd)
-            return True
+
+            # Verify activation
+            time.sleep(0.01)
+            actual_fg = win32gui.GetForegroundWindow()
+            return actual_fg == hwnd
         except Exception:
             # Fallback: try ShowWindow + BringWindowToTop
             try:
@@ -2023,6 +2039,20 @@ class ScanEngine:
                 # Use the first (best) matching window
                 hwnd, title, rect = windows[0]
                 self.detected_window_title = title
+
+                # AUTO-FOCUS: Bring IDE to foreground when first detected or changed
+                # This ensures buttons are visible for screen capture
+                if hwnd != getattr(self, '_last_focused_hwnd', None):
+                    self._last_focused_hwnd = hwnd
+                    try:
+                        self._activate_window(hwnd)
+                        self.log(f"Auto-focused IDE: {title[:50]}", "success")
+                        time.sleep(0.3)  # Let window fully render
+                        # Refresh rect after focus (window might have moved)
+                        rect = win32gui.GetWindowRect(hwnd)
+                    except Exception as e:
+                        self.log(f"Auto-focus failed: {e}", "warning")
+
                 if scan_count % 30 == 1:
                     w = rect[2] - rect[0]
                     h = rect[3] - rect[1]
