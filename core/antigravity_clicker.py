@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Antigravity Autoclicker v2.0
+VegaAutoclicker v2.0
 =======================
 Autonomous coding assistant with auto-click engine + AI agent brain.
 Detects IDE windows running Antigravity / Gemini (or other AI coding
@@ -51,6 +51,7 @@ except Exception:
     pass
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk, scrolledtext, messagebox
 import pyautogui
 import numpy as np
@@ -124,8 +125,8 @@ PROFILES: Dict[str, dict] = {
             "run": {
                 "hsv_min": [90, 60, 60],  "hsv_max": [135, 255, 255],
                 "desc": "Blue (#0078D4-style)",
-                "min_w": 35, "max_w": 300, "min_h": 15, "max_h": 70,
-                "min_ratio": 1.2, "max_ratio": 8.0
+                "min_w": 35, "max_w": 200, "min_h": 15, "max_h": 70,
+                "min_ratio": 1.2, "max_ratio": 6.0
             },
             "accept": {
                 "hsv_min": [90, 60, 60],  "hsv_max": [135, 255, 255],
@@ -402,11 +403,21 @@ class INPUT(ctypes.Structure):
 
 
 def _screen_to_absolute(x: int, y: int) -> Tuple[int, int]:
-    """Convert screen pixels to 0-65535 absolute coordinates."""
-    sw = ctypes.windll.user32.GetSystemMetrics(0)  # SM_CXSCREEN
-    sh = ctypes.windll.user32.GetSystemMetrics(1)  # SM_CYSCREEN
-    abs_x = int(x * 65535 / sw)
-    abs_y = int(y * 65535 / sh)
+    """Convert screen pixels to 0-65535 absolute coordinates.
+    
+    Uses virtual screen dimensions (SM_CXVIRTUALSCREEN / SM_CYVIRTUALSCREEN)
+    and virtual screen origin (SM_XVIRTUALSCREEN / SM_YVIRTUALSCREEN) so that
+    coordinates are correct on multi-monitor setups where secondary monitors
+    may have negative or offset positions.
+    """
+    # Virtual screen = bounding rectangle of ALL monitors
+    virt_left = ctypes.windll.user32.GetSystemMetrics(76)   # SM_XVIRTUALSCREEN
+    virt_top  = ctypes.windll.user32.GetSystemMetrics(77)   # SM_YVIRTUALSCREEN
+    virt_w    = ctypes.windll.user32.GetSystemMetrics(78)   # SM_CXVIRTUALSCREEN
+    virt_h    = ctypes.windll.user32.GetSystemMetrics(79)   # SM_CYVIRTUALSCREEN
+    # Map pixel position into the 0-65535 absolute range relative to virtual screen
+    abs_x = int((x - virt_left) * 65535 / virt_w)
+    abs_y = int((y - virt_top)  * 65535 / virt_h)
     return abs_x, abs_y
 
 
@@ -557,8 +568,8 @@ def find_target_windows(hints: List[str]) -> list:
                 return 1
             title_lower = title.lower()
 
-            # Skip our own GUI window (exact title match only)
-            if title_lower.startswith("\u26a1 antigravity autoclicker"):
+            # Skip our own GUI / app windows
+            if title_lower.startswith("\u26a1 vegaautoclicker"):
                 return 1
 
             # WHITELIST: Only match windows from known IDE executables
@@ -709,77 +720,88 @@ def detect_buttons_color(frame: np.ndarray, profile: dict, settings: dict) -> Li
     return detections
 
 
-def detect_buttons_ocr(frame: np.ndarray, profile: dict, settings: dict) -> List[ButtonDetection]:
-    """Detect buttons using OCR text recognition. Slower but more accurate."""
-    if not OCR_AVAILABLE or not settings.get("use_ocr", True):
+def _render_text_template(text: str, font_size: int = 14) -> np.ndarray:
+    """Render text as a small white-on-black image for template matching."""
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = font_size / 30.0  # approximate scale
+    thickness = 1 if font_size < 16 else 2
+    (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
+    # Pad to give some margin
+    img = np.zeros((th + 10, tw + 10), dtype=np.uint8)
+    cv2.putText(img, text, (5, th + 5), font, scale, 255, thickness)
+    return img
+
+# Template cache: built lazily on first call
+_template_cache: Dict[str, List[Tuple[str, str, np.ndarray]]] = {}
+
+def _build_template_cache(profile: dict) -> Dict[str, List[Tuple[str, str, np.ndarray]]]:
+    """Pre-render keyword templates for a profile. Returns {btn_type: [(keyword, size_label, template_img), ...]}"""
+    cache: Dict[str, List[Tuple[str, str, np.ndarray]]] = {}
+    keywords = profile.get("ocr_keywords", {})
+    for btn_type, kw_list in keywords.items():
+        templates = []
+        for kw in kw_list:
+            if " " in kw:
+                # Multi-word: render as single string
+                for sz, label in [(12, "s"), (14, "m"), (16, "l")]:
+                    tmpl = _render_text_template(kw, sz)
+                    templates.append((kw, label, tmpl))
+            else:
+                for sz, label in [(12, "s"), (14, "m"), (16, "l")]:
+                    tmpl = _render_text_template(kw, sz)
+                    templates.append((kw, label, tmpl))
+        cache[btn_type] = templates
+    return cache
+
+
+def detect_buttons_template(frame: np.ndarray, profile: dict, settings: dict) -> List[ButtonDetection]:
+    """Detect buttons using fast OpenCV template matching (~2ms vs 100-200ms for OCR).
+    
+    Pre-renders expected button text as templates and uses cv2.matchTemplate
+    to find them. Much faster than Tesseract while being accurate for known text.
+    """
+    global _template_cache
+    if not settings.get("use_ocr", True):
         return []
 
+    profile_name = profile.get("name", "default")
+    if profile_name not in _template_cache:
+        _template_cache[profile_name] = _build_template_cache(profile)
+    
+    cache = _template_cache[profile_name]
     detections = []
+    
     try:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Enhance contrast
+        # Enhance text visibility
         _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-        data = pytesseract.image_to_data(thresh, output_type=pytesseract.Output.DICT)
+        
         keywords = profile.get("ocr_keywords", {})
-        busy_words = keywords.get("busy", [])
-
-        # Collect all detected words for multi-word matching
-        n_words = len(data["text"])
-        for i in range(n_words):
-            word = data["text"][i].strip().lower()
-            if not word or len(word) < 2:
+        
+        for btn_type, templates in cache.items():
+            if btn_type == "busy":
+                # For busy detection, just check if any busy keyword template matches
+                for kw, _label, tmpl in templates:
+                    if tmpl.shape[0] >= thresh.shape[0] or tmpl.shape[1] >= thresh.shape[1]:
+                        continue
+                    result = cv2.matchTemplate(thresh, tmpl, cv2.TM_CCOEFF_NORMED)
+                    _, max_val, _, max_loc = cv2.minMaxLoc(result)
+                    if max_val >= 0.6:  # Good match
+                        mx, my = max_loc
+                        detections.append(ButtonDetection(
+                            mx, my, tmpl.shape[1], tmpl.shape[0], "busy", max_val, "template"
+                        ))
+                        break  # One busy indicator is enough
                 continue
-
-            # Notice if this looks like a "busy" indicator
-            # Return a "busy" generic detection so we can trigger a scroll down
-            for bw in busy_words:
-                if bw in word:
-                    detections.append(ButtonDetection(data["left"][i], data["top"][i], data["width"][i], data["height"][i], "busy", 0.9, "ocr"))
-                    break
-
-            for btn_type, kw_list in keywords.items():
-                if btn_type == "busy":
-                    continue
-                if btn_type == "run" and not settings.get("detect_run", True):
-                    continue
-                if btn_type == "accept" and not settings.get("detect_accept", True):
-                    continue
-                if btn_type == "confirm" and not settings.get("detect_confirm", True):
-                    continue
-
-                for kw in kw_list:
-                    matched = False
-                    if " " in kw:
-                        # Multi-word keyword (e.g., "accept all")
-                        parts = kw.split()
-                        if parts[0] in word and i + 1 < n_words:
-                            next_word = data["text"][i + 1].strip().lower()
-                            if parts[1] in next_word:
-                                matched = True
-                    else:
-                        if kw == word or (len(kw) > 3 and kw in word):
-                            matched = True
-
-                    # EXCLUSION GUARD: Do not click "Always run" or "Ask every time"
-                    if matched and btn_type == "run":
-                        prev_word = data["text"][i - 1].strip().lower() if i > 0 else ""
-                        if prev_word in ["always", "ask"]:
-                            matched = False
-
-                    if matched:
-                        bx = data["left"][i]
-                        by = data["top"][i]
-                        bw = data["width"][i]
-                        bh = data["height"][i]
-                        if bw > 10 and bh > 5:
-                            detections.append(ButtonDetection(
-                                bx, by, bw, bh, btn_type, settings.get("confidence", 0.70), "ocr"
-                            ))
-                        break
+            
+            # Template matching is ONLY used for "busy" indicators.
+            # Clickable buttons (run, accept, confirm) MUST come from color detection
+            # to avoid false positives (e.g., matching "run" in "Always run" text).
+            continue
+                    
     except Exception as e:
-        logging.debug(f"OCR detection error: {e}")
-
+        logging.debug(f"Template detection error: {e}")
+    
     return detections
 
 
@@ -837,7 +859,7 @@ class LoopDetector:
             self.click_timestamps[btn_type] = []
         self.click_timestamps[btn_type].append(now)
         self.click_timestamps[btn_type] = [t for t in self.click_timestamps[btn_type] if t > now - 60]
-        return len(self.click_timestamps[btn_type]) >= 4
+        return len(self.click_timestamps[btn_type]) >= 10
 
     def reset(self):
         self.text_hashes.clear()
@@ -1088,7 +1110,7 @@ class ChatController:
         settings = settings or {}
         left, top, right, bottom = window_rect
         win_w = right - left
-        input_clip = settings.get("input_box_clip_px", 120)
+        input_clip = settings.get("input_box_clip_px", 100)
         # Input box center
         if win_w > 800:
             ix = left + int(win_w * 0.55) + (right - left - int(win_w * 0.55)) // 2
@@ -1126,7 +1148,7 @@ class ChatController:
         try:
             left, top, right, bottom = window_rect
             win_w = right - left
-            input_clip = settings.get("input_box_clip_px", 120)
+            input_clip = settings.get("input_box_clip_px", 100)
             input_top = bottom - input_clip
             input_left = left + int(win_w * 0.55) if win_w > 800 else left
             bbox = (input_left, input_top, right - 5, bottom - 5)
@@ -1624,6 +1646,11 @@ class ScanEngine:
         self.detected_profile = None
         self.detected_window_title = None
         self._last_key_time = 0.0  # Track when user last typed
+        self._focus_cooldown_until = 0.0  # Timestamp until which clicks are suppressed
+        self.loop_detector = LoopDetector()  # Click-rate loop detection
+        self._last_toast_time = 0.0  # Rate-limit toast notifications
+        self._last_bottom_hash = None  # For scroll-change detection
+        self._last_scroll_time = 0.0  # Rate-limit scroll operations
 
     def start(self):
         if self.running:
@@ -1645,6 +1672,19 @@ class ScanEngine:
         self.paused = not self.paused
         state = "PAUSED" if self.paused else "RESUMED"
         self.log(f"Scanner {state}", "warning")
+
+    def trigger_focus_cooldown(self, seconds: float = 5.0):
+        """Suppress all clicks for `seconds` after the autoclicker window gains focus.
+        
+        This prevents the autoclicker from immediately clicking the IDE window
+        and stealing focus back before the user can interact with settings.
+        """
+        self._focus_cooldown_until = time.time() + seconds
+        self.log(f"⏸️ Focus cooldown: clicks paused for {seconds:.0f}s", "warning")
+
+    def _is_focus_cooldown_active(self) -> bool:
+        """Check if the focus cooldown is still active."""
+        return time.time() < self._focus_cooldown_until
 
     def log(self, msg: str, tag: str = "info"):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -1672,36 +1712,70 @@ class ScanEngine:
         return find_target_windows(hints)
 
     def _is_user_typing(self) -> bool:
-        """Check if the user is actively using the keyboard.
+        """Check if the user is CURRENTLY holding a typing key down.
         
-        Polls common typing keys via GetAsyncKeyState. If any key was
-        pressed recently (within typing_cooldown_seconds), returns True
-        to prevent clicking while the user is composing a message.
+        Only returns True if a key is literally pressed RIGHT NOW.
+        Uses a very short cooldown (0.5s) to avoid interrupting rapid
+        typing but not causing long pauses that make the scanner
+        appear to 'stop randomly'.
         """
         try:
-            # Check common typing keys: A-Z, 0-9, space, enter, backspace, punctuation
+            # Only check the most critical typing keys (not every key)
             typing_keys = (
                 list(range(0x41, 0x5B)) +    # A-Z
                 list(range(0x30, 0x3A)) +    # 0-9
-                [0x20, 0x08, 0x0D, 0x09] +   # Space, Backspace, Enter, Tab
-                list(range(0xBA, 0xC1)) +    # ;=,-./`
-                list(range(0xDB, 0xE0))      # [\]'
+                [0x20, 0x08, 0x0D]           # Space, Backspace, Enter
             )
             for vk in typing_keys:
-                # Bit 0x8000 = key is currently down, bit 0x0001 = key was pressed since last check
                 state = ctypes.windll.user32.GetAsyncKeyState(vk)
-                if state & 0x8000:  # Key is currently held down
+                if state & 0x8000:  # Key is CURRENTLY held down
                     self._last_key_time = time.time()
                     return True
             
-            # Also consider recent typing within cooldown
-            cooldown = self.settings.get("typing_cooldown_seconds", 3.0)
-            if (time.time() - self._last_key_time) < cooldown:
+            # Very short cooldown — only skip the current scan cycle
+            if (time.time() - self._last_key_time) < 0.5:
                 return True
                 
         except Exception:
             pass
         return False
+
+    def _force_foreground(self, hwnd):
+        """Reliably bring a window to the foreground using AttachThreadInput trick.
+        
+        Windows restricts SetForegroundWindow — only the foreground process can call it.
+        The workaround is to temporarily attach our thread to the foreground thread,
+        call SetForegroundWindow, then detach.
+        """
+        try:
+            # Get our thread and the foreground window's thread
+            our_thread = ctypes.windll.kernel32.GetCurrentThreadId()
+            fg_hwnd = win32gui.GetForegroundWindow()
+            fg_thread = ctypes.windll.user32.GetWindowThreadProcessId(fg_hwnd, None)
+            
+            if our_thread != fg_thread:
+                # Attach our thread to the foreground thread
+                ctypes.windll.user32.AttachThreadInput(our_thread, fg_thread, True)
+                try:
+                    # Restore if minimized
+                    if win32gui.IsIconic(hwnd):
+                        win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+                    win32gui.BringWindowToTop(hwnd)
+                    win32gui.SetForegroundWindow(hwnd)
+                finally:
+                    # Always detach
+                    ctypes.windll.user32.AttachThreadInput(our_thread, fg_thread, False)
+            else:
+                # We're already the foreground thread, just set it
+                if win32gui.IsIconic(hwnd):
+                    win32gui.ShowWindow(hwnd, 9)
+                win32gui.SetForegroundWindow(hwnd)
+        except Exception:
+            # Last resort fallback
+            try:
+                win32gui.SetForegroundWindow(hwnd)
+            except Exception:
+                pass
 
     def _get_scan_region(self, rect: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         """Calculate the scan region — focus on the right panel (AI chat area)
@@ -1734,7 +1808,7 @@ class ScanEngine:
         scan_top = top + int(win_h * (1.0 - bottom_pct))
 
         # CRITICAL: Clip the bottom to exclude the chat input box + send button
-        input_clip = self.settings.get("input_box_clip_px", 120)
+        input_clip = self.settings.get("input_box_clip_px", 100)
         # Popup windows may have a smaller input area
         if win_w <= 800:
             input_clip = min(input_clip, 80)
@@ -1747,45 +1821,112 @@ class ScanEngine:
 
         return (scan_left, scan_top, scan_right, scan_bottom)
 
+    def _has_content_changed(self, frame, scan_bbox) -> bool:
+        """Check if the bottom portion of the chat has new content.
+        
+        Compares a hash of the bottom ~60px of the scan region to detect
+        whether new messages have appeared (meaning we should scroll down).
+        Returns True only if content has genuinely changed.
+        """
+        try:
+            h = frame.shape[0]
+            bottom_strip = frame[max(0, h - 60):h, :]
+            if bottom_strip.size == 0:
+                return False
+            # Downscale to tiny thumbnail for fast comparison
+            small = cv2.resize(bottom_strip, (32, 8))
+            current_hash = hash(small.tobytes())
+            if self._last_bottom_hash is None:
+                self._last_bottom_hash = current_hash
+                return False
+            changed = current_hash != self._last_bottom_hash
+            self._last_bottom_hash = current_hash
+            return changed
+        except Exception:
+            return False
+
+    def _smart_scroll_down(self, frame, scan_bbox):
+        """Scroll the chat down periodically to keep it at the bottom.
+        
+        Scrolls every 2 seconds with 5 notches to keep up with streaming output.
+        """
+        now = time.time()
+        if now - self._last_scroll_time < 2.0:
+            return
+        
+        try:
+            scan_left, scan_top, scan_right, scan_bottom = scan_bbox
+            sx = (scan_left + scan_right) // 2
+            sy = scan_top + int((scan_bottom - scan_top) * 0.75)  # Lower 75% of scan area
+            
+            # Save → scroll → restore in one tight block
+            orig_x, orig_y = win32api.GetCursorPos()
+            sendinput_scroll(sx, sy, clicks=-5, smooth=False)
+            restore_mouse(orig_x, orig_y)
+            
+            self._last_scroll_time = now
+        except Exception as e:
+            logging.debug(f"Scroll error: {e}")
+
     def _perform_click(self, screen_x: int, screen_y: int, detection: ButtonDetection, hwnd=None):
-        """Click the detected button."""
+        """Click the detected button with minimal disruption.
+        
+        Full save/restore cycle:
+        1. Save current foreground window + cursor position
+        2. Activate target IDE window
+        3. Click the button
+        4. Restore cursor position + refocus original window
+        
+        Total operation time: ~150ms — barely noticeable to the user.
+        """
         if not self._check_cooldown(detection.btn_type):
             return False
 
         try:
-            # Move to the window (activate it) if possible
-            if hwnd:
+            # === SAVE STATE ===
+            orig_hwnd = win32gui.GetForegroundWindow()
+            orig_x, orig_y = win32api.GetCursorPos()
+
+            # === ACTIVATE TARGET WINDOW (if needed) ===
+            if hwnd and hwnd != orig_hwnd:
                 try:
-                    win32gui.SetForegroundWindow(hwnd)
-                    time.sleep(0.05)
+                    self._activate_window(hwnd)
+                    time.sleep(0.03)  # Brief settle time
                 except Exception:
                     pass
 
-            # Save original mouse position
-            orig_x, orig_y = win32api.GetCursorPos()
+            # === CLICK (atomic: move → down → up) ===
+            sendinput_click(screen_x, screen_y, hold_ms=30)
 
-            # Click using SendInput (works with Electron apps)
-            sendinput_click(screen_x, screen_y, hold_ms=60)
-
-            # Small delay then restore mouse position
-            time.sleep(0.15)
+            # === RESTORE STATE ===
+            # Electron apps need ~80ms to process the click through their JS event loop
+            time.sleep(0.08)
             restore_mouse(orig_x, orig_y)
+
+            # Refocus original window (only if we changed focus)
+            if hwnd and hwnd != orig_hwnd and orig_hwnd:
+                try:
+                    self._activate_window(orig_hwnd)
+                except Exception:
+                    pass
 
             self._record_click(detection.btn_type)
             self.log(
-                f"✓ CLICKED {detection.btn_type.upper()} button at ({screen_x}, {screen_y}) "
-                f"[{detection.method}, conf={detection.confidence:.0%}]",
+                f"✓ CLICKED {detection.btn_type.upper()} at ({screen_x},{screen_y}) "
+                f"[{detection.method}, {detection.confidence:.0%}]",
                 "success"
             )
 
-            if TOAST_AVAILABLE:
+            # Rate-limited toast: max 1 per 30s
+            if TOAST_AVAILABLE and (time.time() - self._last_toast_time) >= 30.0:
                 try:
                     _toaster.show_toast(
-                        "Antigravity Autoclicker",
+                        "VegaAutoclicker",
                         f"Clicked: {detection.btn_type}",
                         duration=2,
                         threaded=True
                     )
+                    self._last_toast_time = time.time()
                 except Exception:
                     pass
 
@@ -1793,6 +1934,45 @@ class ScanEngine:
 
         except Exception as e:
             self.log(f"Click error: {e}", "error")
+            return False
+
+    @staticmethod
+    def _activate_window(hwnd):
+        """Bring a window to the foreground using the AttachThreadInput trick.
+        
+        SetForegroundWindow() silently fails when called from a background process.
+        The workaround is to attach our thread to the TARGET window's thread,
+        call SetForegroundWindow, then detach. This works reliably.
+        """
+        try:
+            # Check if window still exists
+            if not win32gui.IsWindow(hwnd):
+                return False
+
+            target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
+            curr_thread = win32api.GetCurrentThreadId()
+
+            attached = False
+            if target_thread != curr_thread:
+                # Attach to TARGET window's thread (not foreground window)
+                if ctypes.windll.user32.AttachThreadInput(curr_thread, target_thread, True):
+                    attached = True
+                try:
+                    win32gui.SetForegroundWindow(hwnd)
+                finally:
+                    if attached:
+                        ctypes.windll.user32.AttachThreadInput(curr_thread, target_thread, False)
+            else:
+                win32gui.SetForegroundWindow(hwnd)
+            return True
+        except Exception:
+            # Fallback: try ShowWindow + BringWindowToTop
+            try:
+                win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+                win32gui.BringWindowToTop(hwnd)
+                win32gui.SetForegroundWindow(hwnd)
+            except Exception:
+                pass
             return False
 
     def _scan_loop(self):
@@ -1803,6 +1983,14 @@ class ScanEngine:
         while not self.stop_event.is_set():
             try:
                 if self.paused:
+                    time.sleep(0.5)
+                    continue
+
+                # FOCUS COOLDOWN: Skip clicking when user just focused our window
+                if self._is_focus_cooldown_active():
+                    remaining = self._focus_cooldown_until - time.time()
+                    if remaining > 0 and int(remaining * 2) % 2 == 0:  # Log every ~1s
+                        self.log(f"⏸️ Focus cooldown: {remaining:.0f}s remaining...", "info")
                     time.sleep(0.5)
                     continue
 
@@ -1881,9 +2069,9 @@ class ScanEngine:
                 # Detect buttons via color
                 detections = detect_buttons_color(frame, profile, self.settings)
 
-                # If color detection found nothing, try OCR (slower)
-                if not detections and self.settings.get("use_ocr", True) and OCR_AVAILABLE:
-                    detections = detect_buttons_ocr(
+                # If color detection found nothing, try template matching (fast, ~2ms)
+                if not detections and self.settings.get("use_ocr", True):
+                    detections = detect_buttons_template(
                         frame, profile, self.settings
                     )
 
@@ -1895,27 +2083,37 @@ class ScanEngine:
 
                 # Click the best detection
                 if detections:
-                    best = detections[0]  # Highest confidence after merge
+                    # For "run" buttons: pick the NARROWEST one.
+                    # "Run" is always shorter than "Always run" or "Ask every time".
+                    # This handles any DPI scaling since we compare relative widths.
+                    run_detections = [d for d in detections if d.btn_type == "run"]
+                    other_detections = [d for d in detections if d.btn_type != "run"]
                     
-                    # FINAL OCR VERIFICATION GUARD: For "run" buttons, ensure it doesn't say "Always run"
+                    if len(run_detections) > 1:
+                        # Multiple run buttons — pick narrowest (that's the real "Run")
+                        run_detections.sort(key=lambda d: d.w)
+                        best_run = run_detections[0]
+                        self.log(f"Multiple run buttons: picked narrowest ({best_run.w}px) over wider ({run_detections[-1].w}px)", "info")
+                    elif len(run_detections) == 1:
+                        best_run = run_detections[0]
+                    else:
+                        best_run = None
+                    
+                    # Pick the best overall detection
+                    if other_detections:
+                        best = other_detections[0]  # Non-run buttons get priority (busy, accept, etc.)
+                    elif best_run:
+                        best = best_run
+                    else:
+                        best = detections[0]
+                    
+                    # FINAL: "Always run" guard — if this is the ONLY run button and
+                    # it's suspiciously wide, skip it. Normal "Run" ≈ 50-90px.
                     should_click = True
-                    if best.btn_type == "run" and self.settings.get("use_ocr", True) and OCR_AVAILABLE:
-                        # Crop slightly larger than the button to ensure text is captured
-                        crop_y1 = max(0, int(best.y) - 5)
-                        crop_y2 = min(frame.shape[0], int(best.y + best.h) + 5)
-                        crop_x1 = max(0, int(best.x) - 5)
-                        crop_x2 = min(frame.shape[1], int(best.x + best.w) + 5)
-                        btn_img = frame[crop_y1:crop_y2, crop_x1:crop_x2]
-                        if btn_img.size > 0:
-                            try:
-                                btn_gray = cv2.cvtColor(btn_img, cv2.COLOR_BGR2GRAY)
-                                _, btn_thresh = cv2.threshold(btn_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                                btn_text = pytesseract.image_to_string(btn_thresh).strip().lower()
-                                if "always" in btn_text or "ask" in btn_text:
-                                    self.log(f"Skipping Run button: False positive text detected ('{btn_text}')", "warning")
-                                    should_click = False
-                            except Exception:
-                                pass
+                    if best.btn_type == "run" and len(run_detections) == 1:
+                        if best.w > 100:
+                            self.log(f"Skipping wide Run button ({best.w}px) — likely 'Always run'", "warning")
+                            should_click = False
                                 
                     if should_click:
                         # Convert frame-relative coords to screen coords
@@ -1923,53 +2121,25 @@ class ScanEngine:
                         screen_y = scan_top + best.cy
                         
                         if best.btn_type == "busy":
-                            # Just detected 'generating/thinking' text — scroll down
-                            # to follow the AI's output as it generates
-                            try:
-                                orig_x, orig_y = win32api.GetCursorPos()
-                                sendinput_scroll(screen_x, screen_y, clicks=-3, smooth=True)
-                                time.sleep(0.08)
-                                restore_mouse(orig_x, orig_y)
-                                self.log("Auto-scrolled down (AI generating)...", "info")
-                            except Exception as e:
-                                logging.error(f"Busy scroll error: {e}")
+                            # AI is generating — scroll down only if new content appeared
+                            self._smart_scroll_down(frame, scan_bbox)
                             time.sleep(1.0)
                         else:
+                            # === ONLY move mouse here — confirmed button to click ===
                             self._perform_click(screen_x, screen_y, best, hwnd)
-                            # Reset idle scroll tracker on successful click
-                            self._idle_scan_count = 0
-                            self._idle_scroll_phase = 0
-                            # Longer pause after a click to let UI update
-                            time.sleep(max(interval, 1.0))
+                            # Track click rate for loop detection
+                            if self.loop_detector.record_click(best.btn_type):
+                                self.log("⚠️ Rapid clicking detected (4+ in 60s)!", "warning")
+                            # Short pause after click to let UI update
+                            time.sleep(0.5)
                     else:
-                        # We rejected the best detection, sleep and try again
+                        # Rejected detection, sleep and try again
                         time.sleep(interval)
                 else:
-                    # No buttons detected — scroll to reveal off-screen buttons
-                    # Uses SendInput (not PostMessage) for Electron compatibility
-                    self._idle_scan_count = getattr(self, '_idle_scan_count', 0) + 1
-                    # Scroll phase: 0-2 = scroll down (3 cycles), 3-4 = scroll up (2 cycles), then reset
-                    # This alternates to find buttons above or below the current view
-                    scroll_phase = getattr(self, '_idle_scroll_phase', 0)
-                    if self._idle_scan_count >= 6:
-                        self._idle_scan_count = 0
-                        try:
-                            sx = (scan_left + scan_right) // 2
-                            sy = (scan_top + scan_bottom) // 2
-                            orig_x, orig_y = win32api.GetCursorPos()
-                            if scroll_phase < 3:
-                                # Scroll DOWN to find buttons below
-                                sendinput_scroll(sx, sy, clicks=-4, smooth=True)
-                                self.log("Idle scroll ↓ (looking for buttons below)", "info")
-                            else:
-                                # Scroll UP to find buttons above
-                                sendinput_scroll(sx, sy, clicks=4, smooth=True)
-                                self.log("Idle scroll ↑ (looking for buttons above)", "info")
-                            time.sleep(0.08)
-                            restore_mouse(orig_x, orig_y)
-                            self._idle_scroll_phase = (scroll_phase + 1) % 5
-                        except Exception as e:
-                            logging.error(f"Idle scroll error: {e}")
+                    # No buttons detected — DO NOT move the mouse or scroll randomly.
+                    # Only scroll down if we detect new content at the bottom of the chat
+                    # (i.e., the AI is still generating and chat needs to follow along).
+                    self._smart_scroll_down(frame, scan_bbox)
                     time.sleep(interval)
 
             except Exception as e:
@@ -1985,19 +2155,39 @@ class ScanEngine:
 # ——————————————————————————————————————————————————————————————————————
 
 COLORS = {
-    "bg_dark":    "#0a0e17",
-    "bg_panel":   "#141e30",
-    "bg_card":    "#1a2a40",
-    "bg_input":   "#0d1520",
-    "text":       "#FFFFFF",
-    "text_dim":   "#888888",
-    "accent":     "#00D4FF",
-    "green":      "#00FF88",
-    "red":        "#FF4444",
-    "yellow":     "#FFB800",
-    "orange":     "#FF6B35",
-    "purple":     "#8B5CF6",
+    "bg_dark":      "#0a0e17",
+    "bg_secondary": "#0f1420",
+    "bg_panel":     "#111827",
+    "bg_card":      "#141e30",
+    "bg_card_hover":"#1a2236",
+    "bg_sidebar":   "#0c1019",
+    "bg_input":     "#0d1117",
+    "border":       "#1e293b",
+    "border_active":"#00d4ff40",
+    "text":         "#e2e8f0",
+    "text_dim":     "#94a3b8",
+    "text_muted":   "#64748b",
+    "accent":       "#00D4FF",
+    "accent_dim":   "#0a2a3a",
+    "green":        "#10b981",
+    "green_dim":    "#0a2a1f",
+    "red":          "#ef4444",
+    "red_dim":      "#2a0a0a",
+    "yellow":       "#f59e0b",
+    "yellow_dim":   "#2a1f0a",
+    "orange":       "#f97316",
+    "purple":       "#8B5CF6",
+    "purple_dim":   "#1a0a3a",
+    "pink":         "#ec4899",
 }
+
+# Font families
+FONT_MAIN = "Segoe UI"
+FONT_MONO = "Cascadia Code"
+FONT_HEADING = "Segoe UI Semibold"
+
+# Sidebar width  
+SIDEBAR_WIDTH = 200
 
 
 class AntigravityAutoclickerApp:
@@ -2005,7 +2195,7 @@ class AntigravityAutoclickerApp:
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("⚡ Antigravity Autoclicker v2.0")
+        self.root.title("⚡ VegaAutoclicker v2.0")
         self.root.geometry("960x750")
         self.root.minsize(800, 600)
         self.root.configure(bg=COLORS["bg_dark"])
@@ -2059,7 +2249,8 @@ class AntigravityAutoclickerApp:
         self._bind_hotkey()
         self._poll_hotkey()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-        self._log_info("\u26a1 Antigravity Autoclicker v2.0 ready.", "info")
+        self.root.bind("<FocusIn>", self._on_window_focus)
+        self._log_info("\u26a1 VegaAutoclicker v2.0 ready.", "info")
         threading.Thread(target=self._check_ollama, daemon=True).start()
 
         # File watcher for auto-restart on updates
@@ -2073,230 +2264,563 @@ class AntigravityAutoclickerApp:
         style.configure("Dark.TFrame", background=COLORS["bg_dark"])
         style.configure("Panel.TFrame", background=COLORS["bg_panel"])
         style.configure("Card.TFrame", background=COLORS["bg_card"])
+        style.configure("Sidebar.TFrame", background=COLORS["bg_sidebar"])
         style.configure("Dark.TLabel", background=COLORS["bg_dark"],
-                        foreground=COLORS["text"], font=("Segoe UI", 10))
+                        foreground=COLORS["text"], font=(FONT_MAIN, 10))
         style.configure("Title.TLabel", background=COLORS["bg_dark"],
-                        foreground=COLORS["accent"], font=("Segoe UI", 16, "bold"))
-        style.configure("Status.TLabel", background=COLORS["bg_panel"],
-                        foreground=COLORS["green"], font=("Segoe UI", 10, "bold"))
-        style.configure("StatusOff.TLabel", background=COLORS["bg_panel"],
-                        foreground=COLORS["red"], font=("Segoe UI", 10, "bold"))
+                        foreground=COLORS["accent"], font=(FONT_HEADING, 18, "bold"))
+        style.configure("Subtitle.TLabel", background=COLORS["bg_dark"],
+                        foreground=COLORS["text_dim"], font=(FONT_MAIN, 10))
+        style.configure("Status.TLabel", background=COLORS["bg_dark"],
+                        foreground=COLORS["green"], font=(FONT_MAIN, 10, "bold"))
+        style.configure("StatusOff.TLabel", background=COLORS["bg_dark"],
+                        foreground=COLORS["red"], font=(FONT_MAIN, 10, "bold"))
         style.configure("Dim.TLabel", background=COLORS["bg_dark"],
-                        foreground=COLORS["text_dim"], font=("Segoe UI", 9))
-        style.configure("Dark.TNotebook", background=COLORS["bg_dark"])
-        style.configure("Dark.TNotebook.Tab", background=COLORS["bg_card"],
-                        foreground=COLORS["text"], font=("Segoe UI", 10, "bold"), padding=(12, 6))
-        style.map("Dark.TNotebook.Tab",
-                  background=[("selected", COLORS["accent"])],
-                  foreground=[("selected", "#000000")])
+                        foreground=COLORS["text_dim"], font=(FONT_MAIN, 9))
+        style.configure("CardLabel.TLabel", background=COLORS["bg_card"],
+                        foreground=COLORS["text"], font=(FONT_MAIN, 10))
+        style.configure("CardDim.TLabel", background=COLORS["bg_card"],
+                        foreground=COLORS["text_dim"], font=(FONT_MAIN, 9))
+        style.configure("CardTitle.TLabel", background=COLORS["bg_card"],
+                        foreground=COLORS["text_dim"], font=(FONT_MAIN, 10, "bold"))
+        style.configure("SidebarLabel.TLabel", background=COLORS["bg_sidebar"],
+                        foreground=COLORS["text_dim"], font=(FONT_MAIN, 9))
+        style.configure("SidebarBrand.TLabel", background=COLORS["bg_sidebar"],
+                        foreground=COLORS["accent"], font=(FONT_HEADING, 13, "bold"))
+        style.configure("SidebarVersion.TLabel", background=COLORS["bg_sidebar"],
+                        foreground=COLORS["text_muted"], font=(FONT_MONO, 8))
+        style.configure("Mono.TLabel", background=COLORS["bg_dark"],
+                        foreground=COLORS["text"], font=(FONT_MONO, 10))
+        style.configure("MonoAccent.TLabel", background=COLORS["bg_dark"],
+                        foreground=COLORS["accent"], font=(FONT_MONO, 12, "bold"))
+        # Combobox
+        style.configure("Dark.TCombobox", fieldbackground=COLORS["bg_input"],
+                        background=COLORS["bg_card"], foreground=COLORS["text"],
+                        font=(FONT_MAIN, 10))
+        style.map("Dark.TCombobox",
+                  fieldbackground=[("readonly", COLORS["bg_input"])],
+                  foreground=[("readonly", COLORS["text"])])
+
+    # ── Helper: create a styled card frame ──
+    def _make_card(self, parent, **kwargs):
+        """Create a card-style frame with border and rounded appearance."""
+        card = tk.Frame(parent, bg=COLORS["bg_card"], highlightbackground=COLORS["border"],
+                        highlightthickness=1, padx=16, pady=12, **kwargs)
+        def _on_enter(e):
+            card.configure(highlightbackground=COLORS["accent"])
+        def _on_leave(e):
+            card.configure(highlightbackground=COLORS["border"])
+        card.bind("<Enter>", _on_enter)
+        card.bind("<Leave>", _on_leave)
+        return card
+
+    # ── Helper: create a stat mini card ──
+    def _make_stat_card(self, parent, icon, label, value_var, color):
+        """Create a stat mini card with icon, value, and label."""
+        card = self._make_card(parent)
+        icon_frame = tk.Frame(card, bg=color, width=36, height=36)
+        icon_frame.pack(side=tk.LEFT, padx=(0, 12))
+        icon_frame.pack_propagate(False)
+        tk.Label(icon_frame, text=icon, font=(FONT_MAIN, 14), bg=color, fg="#FFFFFF").place(relx=0.5, rely=0.5, anchor="center")
+        info = tk.Frame(card, bg=COLORS["bg_card"])
+        info.pack(side=tk.LEFT, fill=tk.X)
+        val_lbl = tk.Label(info, textvariable=value_var, font=(FONT_MONO, 16, "bold"),
+                           bg=COLORS["bg_card"], fg=COLORS["text"], anchor="w")
+        val_lbl.pack(anchor="w")
+        tk.Label(info, text=label, font=(FONT_MAIN, 9), bg=COLORS["bg_card"],
+                 fg=COLORS["text_muted"], anchor="w").pack(anchor="w")
+        return card, val_lbl
+
+    # ── Helper: nav button for sidebar ──
+    def _make_nav_btn(self, parent, icon, label, page_name):
+        """Create a sidebar navigation button."""
+        btn = tk.Frame(parent, bg=COLORS["bg_sidebar"], cursor="hand2", padx=12, pady=7)
+        btn.pack(fill=tk.X)
+        tk.Label(btn, text=icon, font=(FONT_MAIN, 13), bg=COLORS["bg_sidebar"],
+                 fg=COLORS["text_dim"], width=2).pack(side=tk.LEFT, padx=(0, 8))
+        lbl = tk.Label(btn, text=label, font=(FONT_MAIN, 11), bg=COLORS["bg_sidebar"],
+                       fg=COLORS["text_dim"], anchor="w")
+        lbl.pack(side=tk.LEFT, fill=tk.X)
+        indicator = tk.Frame(btn, bg=COLORS["bg_sidebar"], width=3, height=24)
+        indicator.pack(side=tk.RIGHT)
+        def _select(e=None):
+            self._select_page(page_name)
+        for w in [btn, lbl]:
+            w.bind("<Button-1>", _select)
+        self._nav_buttons[page_name] = (btn, lbl, indicator)
+        return btn
+
+    def _select_page(self, page_name):
+        """Switch to a different page and update sidebar highlighting."""
+        self._current_page = page_name
+        # Update sidebar highlights
+        for name, (btn, lbl, indicator) in self._nav_buttons.items():
+            if name == page_name:
+                btn.configure(bg=COLORS["accent_dim"])
+                lbl.configure(bg=COLORS["accent_dim"], fg=COLORS["accent"])
+                indicator.configure(bg=COLORS["accent"])
+                for child in btn.winfo_children():
+                    if isinstance(child, tk.Label):
+                        child.configure(bg=COLORS["accent_dim"])
+            else:
+                btn.configure(bg=COLORS["bg_sidebar"])
+                lbl.configure(bg=COLORS["bg_sidebar"], fg=COLORS["text_dim"])
+                indicator.configure(bg=COLORS["bg_sidebar"])
+                for child in btn.winfo_children():
+                    if isinstance(child, tk.Label):
+                        child.configure(bg=COLORS["bg_sidebar"])
+        # Show/hide page frames
+        for name, frame in self._page_frames.items():
+            if name == page_name:
+                frame.pack(fill=tk.BOTH, expand=True)
+            else:
+                frame.pack_forget()
 
     def _build_ui(self):
-        main = ttk.Frame(self.root, style="Dark.TFrame")
-        main.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        # Header
-        header = ttk.Frame(main, style="Dark.TFrame")
-        header.pack(fill=tk.X, pady=(0, 8))
-        ttk.Label(header, text="\u26a1 Antigravity Autoclicker v2.0", style="Title.TLabel").pack(side=tk.LEFT)
-        self.lbl_status = ttk.Label(header, text="\u25cf STANDBY", style="StatusOff.TLabel")
-        self.lbl_status.pack(side=tk.RIGHT, padx=10)
-        self.lbl_clicks = ttk.Label(header, text="Clicks: 0", style="Dim.TLabel")
-        self.lbl_clicks.pack(side=tk.RIGHT, padx=10)
-        # Restart button
-        btn_restart = tk.Button(header, text="🔄 Restart", font=("Segoe UI", 10, "bold"),
-                                bg=COLORS["bg_card"], fg=COLORS["accent"], bd=0,
-                                activebackground=COLORS["accent"], activeforeground="#FFFFFF",
-                                cursor="hand2", command=self._restart, padx=12, pady=4)
-        btn_restart.pack(side=tk.RIGHT, padx=8)
-        # Tabs
-        self.notebook = ttk.Notebook(main, style="Dark.TNotebook")
-        self.notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
-        tab1 = ttk.Frame(self.notebook, style="Dark.TFrame")
-        tab2 = ttk.Frame(self.notebook, style="Dark.TFrame")
-        tab3 = ttk.Frame(self.notebook, style="Dark.TFrame")
-        self.notebook.add(tab1, text="  \U0001f5b1\ufe0f Auto-Clicker  ")
-        self.notebook.add(tab2, text="  \U0001f916 AI Agent  ")
-        self.notebook.add(tab3, text="  \u2699\ufe0f Settings  ")
-        self._build_clicker_tab(tab1)
-        self._build_agent_tab(tab2)
-        self._build_settings_tab(tab3)
-        # Activity log
-        ttk.Label(main, text="\u2501\u2501 ACTIVITY LOG \u2501\u2501", style="Dark.TLabel").pack(fill=tk.X, pady=(5, 2))
+        self._nav_buttons = {}
+        self._page_frames = {}
+        self._current_page = "clicker"
+
+        # Main horizontal layout
+        main_layout = tk.Frame(self.root, bg=COLORS["bg_dark"])
+        main_layout.pack(fill=tk.BOTH, expand=True)
+
+        # ═══════════ SIDEBAR ═══════════
+        sidebar = tk.Frame(main_layout, bg=COLORS["bg_sidebar"], width=SIDEBAR_WIDTH)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+
+        # Brand
+        brand = tk.Frame(sidebar, bg=COLORS["bg_sidebar"], padx=16, pady=14)
+        brand.pack(fill=tk.X)
+        tk.Label(brand, text="⚡ Antigravity", font=(FONT_HEADING, 14, "bold"),
+                 bg=COLORS["bg_sidebar"], fg=COLORS["accent"]).pack(anchor="w")
+        tk.Label(brand, text="v2.0 — Autoclicker", font=(FONT_MONO, 8),
+                 bg=COLORS["bg_sidebar"], fg=COLORS["text_muted"]).pack(anchor="w")
+        # Separator
+        tk.Frame(sidebar, bg=COLORS["border"], height=1).pack(fill=tk.X, padx=12)
+
+        # Nav sections
+        tk.Label(sidebar, text="CONTROLS", font=(FONT_MAIN, 8, "bold"),
+                 bg=COLORS["bg_sidebar"], fg=COLORS["text_muted"], anchor="w",
+                 padx=16, pady=(10, 2)).pack(fill=tk.X)
+        self._make_nav_btn(sidebar, "🖱️", "Auto-Clicker", "clicker")
+        self._make_nav_btn(sidebar, "🤖", "AI Agent", "agent")
+
+        tk.Label(sidebar, text="CONFIGURE", font=(FONT_MAIN, 8, "bold"),
+                 bg=COLORS["bg_sidebar"], fg=COLORS["text_muted"], anchor="w",
+                 padx=16, pady=(10, 2)).pack(fill=tk.X)
+        self._make_nav_btn(sidebar, "⚙️", "Settings", "settings")
+        self._make_nav_btn(sidebar, "🔎", "Debug", "debug")
+
+        # Spacer
+        tk.Frame(sidebar, bg=COLORS["bg_sidebar"]).pack(fill=tk.BOTH, expand=True)
+
+        # Sidebar footer — status
+        tk.Frame(sidebar, bg=COLORS["border"], height=1).pack(fill=tk.X, padx=12)
+        self._sidebar_footer = tk.Frame(sidebar, bg=COLORS["bg_sidebar"], padx=12, pady=8)
+        self._sidebar_footer.pack(fill=tk.X)
+        self._sidebar_status_dot = tk.Label(self._sidebar_footer, text="●", font=(FONT_MAIN, 14),
+                                             bg=COLORS["bg_sidebar"], fg=COLORS["red"])
+        self._sidebar_status_dot.pack(side=tk.LEFT, padx=(0, 6))
+        self._sidebar_status_text = tk.Label(self._sidebar_footer, text="Standby",
+                                              font=(FONT_MAIN, 10), bg=COLORS["bg_sidebar"],
+                                              fg=COLORS["text_dim"])
+        self._sidebar_status_text.pack(side=tk.LEFT)
+
+        # ═══════════ MAIN CONTENT ═══════════
+        content_area = tk.Frame(main_layout, bg=COLORS["bg_dark"])
+        content_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Top header bar
+        header = tk.Frame(content_area, bg=COLORS["bg_dark"], padx=20, pady=12)
+        header.pack(fill=tk.X)
+        self._page_title = tk.Label(header, text="Auto-Clicker", font=(FONT_HEADING, 20, "bold"),
+                                    bg=COLORS["bg_dark"], fg=COLORS["text"])
+        self._page_title.pack(side=tk.LEFT)
+        self._page_subtitle = tk.Label(header, text="Detect and click IDE buttons automatically",
+                                       font=(FONT_MAIN, 10), bg=COLORS["bg_dark"],
+                                       fg=COLORS["text_dim"])
+        self._page_subtitle.pack(side=tk.LEFT, padx=(12, 0), pady=(4, 0))
+
+        # Status badges in header
+        hdr_right = tk.Frame(header, bg=COLORS["bg_dark"])
+        hdr_right.pack(side=tk.RIGHT)
+        self.lbl_clicks = tk.Label(hdr_right, text="0", font=(FONT_MONO, 14, "bold"),
+                                   bg=COLORS["bg_dark"], fg=COLORS["accent"])
+        self.lbl_clicks.pack(side=tk.RIGHT, padx=(8, 0))
+        tk.Label(hdr_right, text="Clicks", font=(FONT_MAIN, 9),
+                 bg=COLORS["bg_dark"], fg=COLORS["text_muted"]).pack(side=tk.RIGHT, padx=(0, 4))
+        self.lbl_status = tk.Label(hdr_right, text="● STANDBY", font=(FONT_MAIN, 10, "bold"),
+                                   bg=COLORS["bg_dark"], fg=COLORS["red"])
+        self.lbl_status.pack(side=tk.RIGHT, padx=(0, 20))
+
+        # Page container
+        page_container = tk.Frame(content_area, bg=COLORS["bg_dark"])
+        page_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 5))
+
+        # Build pages
+        for page_name, builder in [("clicker", self._build_clicker_page),
+                                    ("agent", self._build_agent_page),
+                                    ("settings", self._build_settings_page),
+                                    ("debug", self._build_debug_page)]:
+            frame = tk.Frame(page_container, bg=COLORS["bg_dark"])
+            self._page_frames[page_name] = frame
+            builder(frame)
+
+        # Activity log at bottom
+        log_frame = tk.Frame(content_area, bg=COLORS["bg_dark"], padx=20)
+        log_frame.pack(fill=tk.X, pady=(5, 8))
+        log_header = tk.Frame(log_frame, bg=COLORS["bg_dark"])
+        log_header.pack(fill=tk.X, pady=(0, 4))
+        tk.Label(log_header, text="Activity Log", font=(FONT_MAIN, 10, "bold"),
+                 bg=COLORS["bg_dark"], fg=COLORS["text_dim"]).pack(side=tk.LEFT)
+        tk.Button(log_header, text="Clear", font=(FONT_MAIN, 8), bg=COLORS["bg_card"],
+                  fg=COLORS["text_dim"], relief=tk.FLAT, padx=8, pady=1, bd=0,
+                  command=self._clear_log, cursor="hand2").pack(side=tk.RIGHT)
+        tk.Label(log_header, text="Ctrl+Shift+P to pause", font=(FONT_MAIN, 8),
+                 bg=COLORS["bg_dark"], fg=COLORS["text_muted"]).pack(side=tk.RIGHT, padx=10)
+
         self.log_text = scrolledtext.ScrolledText(
-            main, wrap=tk.WORD, bg=COLORS["bg_panel"], fg=COLORS["text_dim"],
-            insertbackground=COLORS["text"], font=("Consolas", 9),
-            relief=tk.FLAT, state=tk.DISABLED, height=8)
-        self.log_text.pack(fill=tk.BOTH, expand=False)
+            log_frame, wrap=tk.WORD, bg=COLORS["bg_panel"], fg=COLORS["text_dim"],
+            insertbackground=COLORS["text"], font=(FONT_MONO, 9),
+            relief=tk.FLAT, state=tk.DISABLED, height=6,
+            highlightbackground=COLORS["border"], highlightthickness=1)
+        self.log_text.pack(fill=tk.X)
         for tag, clr in [("info", COLORS["text_dim"]), ("success", COLORS["green"]),
                          ("warning", COLORS["yellow"]), ("error", COLORS["red"]),
                          ("detect", COLORS["accent"])]:
             self.log_text.tag_configure(tag, foreground=clr)
-        # Footer
-        ft = ttk.Frame(main, style="Dark.TFrame")
-        ft.pack(fill=tk.X, pady=(3, 0))
-        ttk.Label(ft, text="Hotkey: Ctrl+Shift+P | Failsafe: corner", style="Dim.TLabel").pack(side=tk.LEFT)
-        tk.Button(ft, text="Clear Log", font=("Segoe UI", 9), bg=COLORS["bg_card"],
-                  fg=COLORS["text_dim"], relief=tk.FLAT, padx=10,
-                  command=self._clear_log).pack(side=tk.RIGHT)
 
-    def _build_clicker_tab(self, parent):
-        c = ttk.Frame(parent, style="Dark.TFrame")
-        c.pack(fill=tk.X, pady=8, padx=5)
-        self.btn_start = tk.Button(c, text="\u25b6  START", font=("Segoe UI", 13, "bold"),
-            bg=COLORS["green"], fg="#000000", activebackground="#00CC66",
-            relief=tk.FLAT, padx=25, pady=8, command=self._toggle_scanner)
+        # Select initial page
+        self._select_page("clicker")
+
+    # ═══════════ CLICKER PAGE ═══════════
+    def _build_clicker_page(self, parent):
+        # Top row: Start/Stop + Pause
+        ctrl = tk.Frame(parent, bg=COLORS["bg_dark"])
+        ctrl.pack(fill=tk.X, pady=(0, 12))
+
+        self.btn_start = tk.Button(ctrl, text="▶  START SCANNING", font=(FONT_MAIN, 12, "bold"),
+            bg=COLORS["green"], fg="#000000", activebackground="#0a8c5f",
+            relief=tk.FLAT, padx=28, pady=10, command=self._toggle_scanner, cursor="hand2")
         self.btn_start.pack(side=tk.LEFT, padx=(0, 8))
-        self.btn_pause = tk.Button(c, text="\u23f8 PAUSE", font=("Segoe UI", 11),
-            bg=COLORS["yellow"], fg="#000000", activebackground="#CC9900",
-            relief=tk.FLAT, padx=15, pady=8, command=self._toggle_pause, state=tk.DISABLED)
+        self.btn_pause = tk.Button(ctrl, text="⏸ Pause", font=(FONT_MAIN, 10),
+            bg=COLORS["bg_card"], fg=COLORS["yellow"], activebackground=COLORS["bg_card_hover"],
+            relief=tk.FLAT, padx=14, pady=10, command=self._toggle_pause,
+            state=tk.DISABLED, cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1)
         self.btn_pause.pack(side=tk.LEFT, padx=(0, 8))
-        pf = ttk.Frame(c, style="Dark.TFrame")
-        pf.pack(side=tk.RIGHT)
-        ttk.Label(pf, text="Target:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 5))
-        self.combo_profile = ttk.Combobox(pf, textvariable=self.var_profile,
-            values=list(PROFILES.keys()), state="readonly", width=18, font=("Segoe UI", 10))
-        self.combo_profile.pack(side=tk.LEFT)
-        self.combo_profile.bind("<<ComboboxSelected>>", self._on_profile_change)
-        self.lbl_profile_desc = ttk.Label(pf, text="", style="Dim.TLabel")
-        self.lbl_profile_desc.pack(side=tk.LEFT, padx=(10, 0))
-        self._update_profile_desc()
-        # Toggles
-        tg = ttk.Frame(parent, style="Dark.TFrame")
-        tg.pack(fill=tk.X, padx=5, pady=2)
-        ttk.Label(tg, text="Detect:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 8))
-        for txt, var in [("Run/Continue", self.var_run), ("Accept All", self.var_accept),
-                         ("Confirm", self.var_confirm), ("OCR Assist", self.var_ocr),
-                         ("Auto-Detect IDE", self.var_auto_detect)]:
-            tk.Checkbutton(tg, text=txt, variable=var, bg=COLORS["bg_dark"],
-                fg=COLORS["text"], selectcolor=COLORS["bg_card"],
-                activebackground=COLORS["bg_dark"], activeforeground=COLORS["text"],
-                font=("Segoe UI", 10), command=self._save_settings).pack(side=tk.LEFT, padx=4)
-        r2 = ttk.Frame(parent, style="Dark.TFrame")
-        r2.pack(fill=tk.X, padx=5, pady=2)
-        ttk.Label(r2, text="Interval(s):", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 3))
-        e1 = tk.Entry(r2, textvariable=self.var_interval, width=6, bg=COLORS["bg_input"],
-            fg=COLORS["text"], insertbackground=COLORS["text"], font=("Segoe UI", 10), relief=tk.FLAT)
-        e1.pack(side=tk.LEFT, padx=(0, 15))
-        e1.bind("<FocusOut>", lambda e: self._save_settings())
-        ttk.Label(r2, text="Confidence:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 3))
-        e2 = tk.Entry(r2, textvariable=self.var_confidence, width=6, bg=COLORS["bg_input"],
-            fg=COLORS["text"], insertbackground=COLORS["text"], font=("Segoe UI", 10), relief=tk.FLAT)
-        e2.pack(side=tk.LEFT, padx=(0, 15))
-        e2.bind("<FocusOut>", lambda e: self._save_settings())
-        self.lbl_window = ttk.Label(r2, text="Window: \u2014", style="Dim.TLabel")
-        self.lbl_window.pack(side=tk.RIGHT)
 
-    def _build_agent_tab(self, parent):
-        top = ttk.Frame(parent, style="Dark.TFrame")
-        top.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(top, text="Mode:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 4))
-        ttk.Combobox(top, textvariable=self.var_agent_mode, values=list(AGENT_MODES.keys()),
-            state="readonly", width=14, font=("Segoe UI", 10)).pack(side=tk.LEFT, padx=(0, 12))
-        ttk.Label(top, text="Model:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 4))
-        self.combo_model = ttk.Combobox(top, textvariable=self.var_agent_model,
-            values=["phi3:mini"], state="readonly", width=16, font=("Segoe UI", 10))
-        self.combo_model.pack(side=tk.LEFT, padx=(0, 12))
-        self.btn_agent_start = tk.Button(top, text="\u25b6 Start Agent", font=("Segoe UI", 11, "bold"),
-            bg=COLORS["purple"], fg="#FFFFFF", activebackground="#7C4DDB",
-            relief=tk.FLAT, padx=15, pady=5, command=self._start_agent)
-        self.btn_agent_start.pack(side=tk.LEFT, padx=(0, 5))
-        self.btn_agent_stop = tk.Button(top, text="\u25a0 Stop", font=("Segoe UI", 11),
-            bg=COLORS["red"], fg="#FFFFFF", activebackground="#CC3333",
-            relief=tk.FLAT, padx=10, pady=5, command=self._stop_agent, state=tk.DISABLED)
+        # Restart
+        tk.Button(ctrl, text="🔄", font=(FONT_MAIN, 12), bg=COLORS["bg_card"],
+                  fg=COLORS["text_dim"], relief=tk.FLAT, padx=10, pady=8,
+                  command=self._restart, cursor="hand2",
+                  highlightbackground=COLORS["border"], highlightthickness=1).pack(side=tk.RIGHT)
+
+        # Stats row
+        stats_frame = tk.Frame(parent, bg=COLORS["bg_dark"])
+        stats_frame.pack(fill=tk.X, pady=(0, 12))
+
+        self._var_stat_profile = tk.StringVar(value="antigravity")
+        self._var_stat_clicks = tk.StringVar(value="0")
+        self._var_stat_window = tk.StringVar(value="—")
+        self._var_stat_ocr = tk.StringVar(value="Yes" if OCR_AVAILABLE else "No")
+
+        for i, (icon, lbl, var, clr) in enumerate([
+            ("🎯", "Profile", self._var_stat_profile, COLORS["accent"]),
+            ("🖱️", "Total Clicks", self._var_stat_clicks, COLORS["green"]),
+            ("🪟", "Target Window", self._var_stat_window, COLORS["purple"]),
+            ("👁️", "OCR Ready", self._var_stat_ocr, COLORS["yellow"]),
+        ]):
+            card, _ = self._make_stat_card(stats_frame, icon, lbl, var, clr)
+            card.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0 if i == 0 else 6, 0))
+
+        # Profile selector
+        profile_card = self._make_card(parent)
+        profile_card.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(profile_card, text="TARGET PROFILE", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(0, 8))
+        profile_grid = tk.Frame(profile_card, bg=COLORS["bg_card"])
+        profile_grid.pack(fill=tk.X)
+        for key, profile in PROFILES.items():
+            name = profile.get("name", key)
+            pf = tk.Frame(profile_grid, bg=COLORS["bg_panel"], padx=12, pady=8,
+                          cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1)
+            pf.pack(side=tk.LEFT, padx=(0, 6), fill=tk.X, expand=True)
+            tk.Label(pf, text=name[:20], font=(FONT_MAIN, 9, "bold"),
+                     bg=COLORS["bg_panel"], fg=COLORS["text"]).pack(anchor="w")
+            tk.Label(pf, text=key, font=(FONT_MONO, 8),
+                     bg=COLORS["bg_panel"], fg=COLORS["text_muted"]).pack(anchor="w")
+            pf.bind("<Button-1>", lambda e, k=key: self._set_profile(k))
+            for child in pf.winfo_children():
+                child.bind("<Button-1>", lambda e, k=key: self._set_profile(k))
+        # Hidden combobox for compatibility
+        self.combo_profile = ttk.Combobox(profile_card, textvariable=self.var_profile,
+            values=list(PROFILES.keys()), state="readonly", width=18, font=(FONT_MAIN, 10))
+        self.combo_profile.bind("<<ComboboxSelected>>", self._on_profile_change)
+        self.lbl_profile_desc = tk.Label(profile_card, text="", bg=COLORS["bg_card"],
+                                         fg=COLORS["text_dim"], font=(FONT_MAIN, 9))
+        # These are hidden — profiles are selected via the grid above
+
+        # Detection settings card
+        detect_card = self._make_card(parent)
+        detect_card.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(detect_card, text="DETECTION SETTINGS", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(0, 8))
+        toggles = tk.Frame(detect_card, bg=COLORS["bg_card"])
+        toggles.pack(fill=tk.X)
+        for txt, var in [("🟢 Run/Continue", self.var_run), ("✅ Accept All", self.var_accept),
+                         ("☑️ Confirm", self.var_confirm), ("👁️ OCR Assist", self.var_ocr),
+                         ("🔍 Auto-Detect IDE", self.var_auto_detect)]:
+            tk.Checkbutton(toggles, text=txt, variable=var, bg=COLORS["bg_card"],
+                fg=COLORS["text"], selectcolor=COLORS["bg_panel"],
+                activebackground=COLORS["bg_card"], activeforeground=COLORS["text"],
+                font=(FONT_MAIN, 10), command=self._save_settings).pack(side=tk.LEFT, padx=(0, 12))
+
+        # Interval / confidence
+        params = tk.Frame(detect_card, bg=COLORS["bg_card"], pady=6)
+        params.pack(fill=tk.X)
+        tk.Label(params, text="Interval:", font=(FONT_MAIN, 10), bg=COLORS["bg_card"],
+                 fg=COLORS["text_dim"]).pack(side=tk.LEFT, padx=(0, 4))
+        e1 = tk.Entry(params, textvariable=self.var_interval, width=5, bg=COLORS["bg_input"],
+            fg=COLORS["text"], insertbackground=COLORS["text"], font=(FONT_MONO, 10),
+            relief=tk.FLAT, highlightbackground=COLORS["border"], highlightthickness=1)
+        e1.pack(side=tk.LEFT, padx=(0, 4), ipady=3)
+        e1.bind("<FocusOut>", lambda e: self._save_settings())
+        tk.Label(params, text="sec", font=(FONT_MAIN, 9), bg=COLORS["bg_card"],
+                 fg=COLORS["text_muted"]).pack(side=tk.LEFT, padx=(0, 16))
+        tk.Label(params, text="Confidence:", font=(FONT_MAIN, 10), bg=COLORS["bg_card"],
+                 fg=COLORS["text_dim"]).pack(side=tk.LEFT, padx=(0, 4))
+        e2 = tk.Entry(params, textvariable=self.var_confidence, width=5, bg=COLORS["bg_input"],
+            fg=COLORS["text"], insertbackground=COLORS["text"], font=(FONT_MONO, 10),
+            relief=tk.FLAT, highlightbackground=COLORS["border"], highlightthickness=1)
+        e2.pack(side=tk.LEFT, padx=(0, 4), ipady=3)
+        e2.bind("<FocusOut>", lambda e: self._save_settings())
+
+        self.lbl_window = tk.Label(params, text="Window: —", font=(FONT_MAIN, 9),
+                                   bg=COLORS["bg_card"], fg=COLORS["text_muted"])
+        self.lbl_window.pack(side=tk.RIGHT)
+        self._update_profile_desc()
+
+    def _set_profile(self, key):
+        """Set profile via the profile card grid."""
+        self.var_profile.set(key)
+        self._on_profile_change()
+        self._var_stat_profile.set(key)
+
+    # ═══════════ AGENT PAGE ═══════════
+    def _build_agent_page(self, parent):
+        # Top control bar
+        ctrl = tk.Frame(parent, bg=COLORS["bg_dark"])
+        ctrl.pack(fill=tk.X, pady=(0, 10))
+
+        # Mode selector
+        mode_card = self._make_card(ctrl)
+        mode_card.pack(side=tk.LEFT, padx=(0, 8))
+        tk.Label(mode_card, text="Mode", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w")
+        mode_combo = ttk.Combobox(mode_card, textvariable=self.var_agent_mode,
+            values=list(AGENT_MODES.keys()), state="readonly", width=12, font=(FONT_MAIN, 10))
+        mode_combo.pack(anchor="w", pady=(2, 0))
+
+        # Model selector
+        model_card = self._make_card(ctrl)
+        model_card.pack(side=tk.LEFT, padx=(0, 8))
+        tk.Label(model_card, text="Model", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w")
+        self.combo_model = ttk.Combobox(model_card, textvariable=self.var_agent_model,
+            values=["phi3:mini"], state="readonly", width=18, font=(FONT_MAIN, 10))
+        self.combo_model.pack(anchor="w", pady=(2, 0))
+
+        # Agent buttons
+        btn_frame = tk.Frame(ctrl, bg=COLORS["bg_dark"])
+        btn_frame.pack(side=tk.RIGHT)
+        self.btn_agent_start = tk.Button(btn_frame, text="▶ Start Agent",
+            font=(FONT_MAIN, 11, "bold"), bg=COLORS["purple"], fg="#FFFFFF",
+            activebackground="#7C4DDB", relief=tk.FLAT, padx=18, pady=8,
+            command=self._start_agent, cursor="hand2")
+        self.btn_agent_start.pack(side=tk.LEFT, padx=(0, 6))
+        self.btn_agent_stop = tk.Button(btn_frame, text="■ Stop",
+            font=(FONT_MAIN, 11), bg=COLORS["bg_card"], fg=COLORS["red"],
+            activebackground=COLORS["bg_card_hover"], relief=tk.FLAT, padx=14, pady=8,
+            command=self._stop_agent, state=tk.DISABLED, cursor="hand2",
+            highlightbackground=COLORS["border"], highlightthickness=1)
         self.btn_agent_stop.pack(side=tk.LEFT)
-        sf = ttk.Frame(parent, style="Dark.TFrame")
-        sf.pack(fill=tk.X, padx=5, pady=2)
-        self.lbl_agent_status = ttk.Label(sf, text="Status: Idle", style="Dim.TLabel")
+
+        # Status bar
+        status_bar = tk.Frame(parent, bg=COLORS["bg_dark"])
+        status_bar.pack(fill=tk.X, pady=(0, 8))
+        self.lbl_agent_status = tk.Label(status_bar, text="Status: Idle",
+            font=(FONT_MAIN, 10), bg=COLORS["bg_dark"], fg=COLORS["text_dim"])
         self.lbl_agent_status.pack(side=tk.LEFT)
-        self.lbl_ollama_status = ttk.Label(sf, text="Ollama: checking...", style="Dim.TLabel")
+        self.lbl_ollama_status = tk.Label(status_bar, text="Ollama: checking...",
+            font=(FONT_MAIN, 10), bg=COLORS["bg_dark"], fg=COLORS["text_dim"])
         self.lbl_ollama_status.pack(side=tk.RIGHT)
-        self.lbl_agent_steps = ttk.Label(sf, text="Steps: 0", style="Dim.TLabel")
+        self.lbl_agent_steps = tk.Label(status_bar, text="Steps: 0",
+            font=(FONT_MONO, 10, "bold"), bg=COLORS["bg_dark"], fg=COLORS["accent"])
         self.lbl_agent_steps.pack(side=tk.RIGHT, padx=15)
-        self.agent_chat = scrolledtext.ScrolledText(parent, wrap=tk.WORD, bg=COLORS["bg_panel"],
-            fg=COLORS["text"], insertbackground=COLORS["text"], font=("Consolas", 10),
-            relief=tk.FLAT, state=tk.DISABLED, height=12)
-        self.agent_chat.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Chat display
+        chat_frame = tk.Frame(parent, bg=COLORS["bg_dark"])
+        chat_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+        self.agent_chat = scrolledtext.ScrolledText(chat_frame, wrap=tk.WORD,
+            bg=COLORS["bg_panel"], fg=COLORS["text"], insertbackground=COLORS["text"],
+            font=(FONT_MONO, 10), relief=tk.FLAT, state=tk.DISABLED,
+            highlightbackground=COLORS["border"], highlightthickness=1)
+        self.agent_chat.pack(fill=tk.BOTH, expand=True)
         self.agent_chat.tag_configure("user", foreground=COLORS["accent"])
         self.agent_chat.tag_configure("agent", foreground=COLORS["green"])
         self.agent_chat.tag_configure("system", foreground=COLORS["yellow"])
-        inf = ttk.Frame(parent, style="Dark.TFrame")
-        inf.pack(fill=tk.X, padx=5, pady=(0, 5))
-        self.agent_input = tk.Entry(inf, bg=COLORS["bg_input"], fg=COLORS["text"],
-            insertbackground=COLORS["text"], font=("Segoe UI", 11), relief=tk.FLAT)
-        self.agent_input.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=6)
-        self.agent_input.bind("<Return>", lambda e: self._send_agent_msg())
-        tk.Button(inf, text="Send", font=("Segoe UI", 10, "bold"), bg=COLORS["accent"],
-            fg="#000000", activebackground="#00B8D9", relief=tk.FLAT, padx=15, pady=5,
-            command=self._send_agent_msg).pack(side=tk.RIGHT, padx=(5, 0))
 
-    def _build_settings_tab(self, parent):
-        sf = ttk.Frame(parent, style="Dark.TFrame")
-        sf.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        r = 0
-        def ck(txt, var, row):
-            tk.Checkbutton(sf, text=txt, variable=var, bg=COLORS["bg_dark"], fg=COLORS["text"],
-                selectcolor=COLORS["bg_card"], activebackground=COLORS["bg_dark"],
-                activeforeground=COLORS["text"], font=("Segoe UI", 10),
-                command=self._save_settings, anchor="w").grid(row=row, column=0, columnspan=2, sticky="w", pady=3)
-        ttk.Label(sf, text="\u2501\u2501 Display \u2501\u2501", style="Dark.TLabel").grid(row=r, column=0, columnspan=2, sticky="w", pady=(0, 5)); r += 1
-        ck("\U0001f52c Debug Overlay (scan visualization)", self.var_debug_overlay, r); r += 1
-        ck("\U0001f504 Loop Detection (detect AI spam)", self.var_loop_detect, r); r += 1
-        ttk.Label(sf, text="\u2501\u2501 Ollama \u2501\u2501", style="Dark.TLabel").grid(row=r, column=0, columnspan=2, sticky="w", pady=(10, 5)); r += 1
-        tk.Button(sf, text="Install Ollama \u2192", font=("Segoe UI", 9), bg=COLORS["bg_card"],
-            fg=COLORS["accent"], relief=tk.FLAT, padx=10,
-            command=lambda: webbrowser.open("https://ollama.com")).grid(row=r, column=0, sticky="w", pady=5); r += 1
-        tk.Button(sf, text="Pull Selected Model", font=("Segoe UI", 9), bg=COLORS["bg_card"],
-            fg=COLORS["green"], relief=tk.FLAT, padx=10,
-            command=self._pull_model).grid(row=r, column=0, sticky="w", pady=2)
-        tk.Button(sf, text="🔄 Refresh Models", font=("Segoe UI", 9), bg=COLORS["bg_card"],
-            fg=COLORS["accent"], relief=tk.FLAT, padx=10,
+        # Input box
+        inp_frame = tk.Frame(parent, bg=COLORS["bg_dark"])
+        inp_frame.pack(fill=tk.X)
+        self.agent_input = tk.Entry(inp_frame, bg=COLORS["bg_input"], fg=COLORS["text"],
+            insertbackground=COLORS["text"], font=(FONT_MAIN, 11), relief=tk.FLAT,
+            highlightbackground=COLORS["border"], highlightthickness=1)
+        self.agent_input.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(0, 6))
+        self.agent_input.bind("<Return>", lambda e: self._send_agent_msg())
+        self.agent_input.insert(0, "Type a task description and click Start Agent...")
+        self.agent_input.bind("<FocusIn>", lambda e: self.agent_input.delete(0, tk.END) if self.agent_input.get().startswith("Type") else None)
+        tk.Button(inp_frame, text="Send", font=(FONT_MAIN, 10, "bold"), bg=COLORS["accent"],
+            fg="#000000", activebackground="#00B8D9", relief=tk.FLAT, padx=18, pady=8,
+            command=self._send_agent_msg, cursor="hand2").pack(side=tk.RIGHT)
+
+    # ═══════════ SETTINGS PAGE ═══════════
+    def _build_settings_page(self, parent):
+        # Display settings card
+        disp_card = self._make_card(parent)
+        disp_card.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(disp_card, text="DISPLAY", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(0, 6))
+        for txt, var in [("🔬 Debug Overlay (scan visualization)", self.var_debug_overlay),
+                         ("🔄 Loop Detection (detect AI spam)", self.var_loop_detect)]:
+            tk.Checkbutton(disp_card, text=txt, variable=var, bg=COLORS["bg_card"],
+                fg=COLORS["text"], selectcolor=COLORS["bg_panel"],
+                activebackground=COLORS["bg_card"], activeforeground=COLORS["text"],
+                font=(FONT_MAIN, 10), command=self._save_settings, anchor="w").pack(anchor="w", pady=2)
+
+        # Ollama settings card
+        ollama_card = self._make_card(parent)
+        ollama_card.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(ollama_card, text="OLLAMA AI ENGINE", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(0, 6))
+        btn_row = tk.Frame(ollama_card, bg=COLORS["bg_card"])
+        btn_row.pack(fill=tk.X, pady=4)
+        tk.Button(btn_row, text="🌐 Install Ollama", font=(FONT_MAIN, 10),
+            bg=COLORS["bg_panel"], fg=COLORS["accent"], relief=tk.FLAT, padx=14, pady=6,
+            cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1,
+            command=lambda: webbrowser.open("https://ollama.com")).pack(side=tk.LEFT, padx=(0, 6))
+        tk.Button(btn_row, text="⬇️ Pull Selected Model", font=(FONT_MAIN, 10),
+            bg=COLORS["bg_panel"], fg=COLORS["green"], relief=tk.FLAT, padx=14, pady=6,
+            cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1,
+            command=self._pull_model).pack(side=tk.LEFT, padx=(0, 6))
+        tk.Button(btn_row, text="🔄 Refresh Models", font=(FONT_MAIN, 10),
+            bg=COLORS["bg_panel"], fg=COLORS["accent"], relief=tk.FLAT, padx=14, pady=6,
+            cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1,
             command=lambda: threading.Thread(target=self._check_ollama, daemon=True).start()
-            ).grid(row=r, column=1, sticky="w", padx=5, pady=2); r += 1
-        ttk.Label(sf, text="\u2501\u2501 System \u2501\u2501", style="Dark.TLabel").grid(row=r, column=0, columnspan=2, sticky="w", pady=(10, 5)); r += 1
-        tk.Button(sf, text="\U0001f4e5 Minimize to Tray", font=("Segoe UI", 10), bg=COLORS["bg_card"],
-            fg=COLORS["text"], relief=tk.FLAT, padx=15, pady=5,
-            command=self._minimize_to_tray).grid(row=r, column=0, sticky="w", pady=3)
+            ).pack(side=tk.LEFT)
+
+        # System settings card
+        sys_card = self._make_card(parent)
+        sys_card.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(sys_card, text="SYSTEM", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(0, 6))
+        sys_btns = tk.Frame(sys_card, bg=COLORS["bg_card"])
+        sys_btns.pack(fill=tk.X, pady=4)
+        tk.Button(sys_btns, text="📥 Minimize to Tray", font=(FONT_MAIN, 10),
+            bg=COLORS["bg_panel"], fg=COLORS["text"], relief=tk.FLAT, padx=14, pady=6,
+            cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1,
+            command=self._minimize_to_tray).pack(side=tk.LEFT, padx=(0, 6))
+        tk.Button(sys_btns, text="🔄 Restart App", font=(FONT_MAIN, 10),
+            bg=COLORS["bg_panel"], fg=COLORS["yellow"], relief=tk.FLAT, padx=14, pady=6,
+            cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1,
+            command=self._restart).pack(side=tk.LEFT)
+
+    # ═══════════ DEBUG PAGE ═══════════
+    def _build_debug_page(self, parent):
+        debug_card = self._make_card(parent)
+        debug_card.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(debug_card, text="SCAN VISUALIZATION", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(0, 6))
+        tk.Label(debug_card, text="Enable 'Debug Overlay' in Settings to see what the scanner detects in real-time.",
+                 font=(FONT_MAIN, 10), bg=COLORS["bg_card"], fg=COLORS["text_dim"],
+                 wraplength=600).pack(anchor="w", pady=4)
+        tk.Button(debug_card, text="Toggle Debug Overlay", font=(FONT_MAIN, 10, "bold"),
+            bg=COLORS["accent"], fg="#000000", relief=tk.FLAT, padx=18, pady=8,
+            cursor="hand2", command=lambda: (self.var_debug_overlay.set(not self.var_debug_overlay.get()), self._save_settings())
+            ).pack(anchor="w", pady=6)
+
+        info_card = self._make_card(parent)
+        info_card.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(info_card, text="SYSTEM INFO", font=(FONT_MAIN, 9, "bold"),
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(0, 6))
+        for label, value in [
+            ("OCR Engine", "Tesseract (available)" if OCR_AVAILABLE else "Not installed"),
+            ("Clipboard", "win32clipboard" if CLIPBOARD_AVAILABLE else "Fallback mode"),
+            ("Toast Notifications", "Available" if TOAST_AVAILABLE else "Not available"),
+            ("System Tray", "Available" if TRAY_AVAILABLE else "Not available"),
+        ]:
+            row = tk.Frame(info_card, bg=COLORS["bg_card"])
+            row.pack(fill=tk.X, pady=2)
+            tk.Label(row, text=label, font=(FONT_MAIN, 10), bg=COLORS["bg_card"],
+                     fg=COLORS["text_dim"]).pack(side=tk.LEFT)
+            color = COLORS["green"] if "available" in value.lower() or "Available" in value else COLORS["yellow"]
+            tk.Label(row, text=value, font=(FONT_MONO, 10), bg=COLORS["bg_card"],
+                     fg=color).pack(side=tk.RIGHT)
 
     # ── Agent ───────────────────────────────────────────────────
+    _ollama_check_lock = threading.Lock()
+
     def _check_ollama(self):
-        """Check Ollama status and auto-start if installed but not running."""
-        installed = OllamaClient.is_installed()
-        running = False
-        models = []
+        """Check Ollama status and auto-start if installed but not running.
+        
+        Uses a lock to prevent concurrent auto-start attempts when multiple
+        background threads call this (e.g. startup + Refresh Models button).
+        """
+        if not self._ollama_check_lock.acquire(blocking=False):
+            return  # Another check is already in progress
+        try:
+            installed = OllamaClient.is_installed()
+            running = False
+            models = []
 
-        if installed:
-            running = self.ollama.is_running()
-            if not running:
-                # Auto-start Ollama if installed but not running
-                self._enqueue_log("Ollama installed but not running. Starting...", "info")
-                self.ollama.start_server(max_wait=10)
+            if installed:
                 running = self.ollama.is_running()
+                if not running:
+                    # Auto-start Ollama if installed but not running
+                    self._enqueue_log("Ollama installed but not running. Starting...", "info")
+                    self.ollama.start_server(max_wait=10)
+                    running = self.ollama.is_running()
+                    if running:
+                        self._enqueue_log("\u2705 Ollama server auto-started", "success")
+                    else:
+                        self._enqueue_log("\u26a0\ufe0f Could not auto-start Ollama", "warning")
                 if running:
-                    self._enqueue_log("\u2705 Ollama server auto-started", "success")
-                else:
-                    self._enqueue_log("\u26a0\ufe0f Could not auto-start Ollama", "warning")
-            if running:
-                models = self.ollama.list_models()
+                    models = self.ollama.list_models()
 
-        def _u():
-            if not installed:
-                self.lbl_ollama_status.configure(text="Ollama: \u274c Not installed")
-            elif not running:
-                self.lbl_ollama_status.configure(text="Ollama: \u26a0\ufe0f Not running")
-            else:
-                self.lbl_ollama_status.configure(text=f"Ollama: \u2705 ({len(models)} models)")
-                if models:
-                    self.combo_model.configure(values=models)
-                    current = self.var_agent_model.get()
-                    if current not in models:
-                        # Prefer coding-oriented models
-                        preferred = ["codellama:latest", "llama3.2:latest", "llama3.1:8b"]
-                        chosen = None
-                        for p in preferred:
-                            if p in models:
-                                chosen = p
-                                break
-                        self.var_agent_model.set(chosen or models[0])
-        self.root.after(0, _u)
+            def _u():
+                if not installed:
+                    self.lbl_ollama_status.configure(text="Ollama: \u274c Not installed")
+                elif not running:
+                    self.lbl_ollama_status.configure(text="Ollama: \u26a0\ufe0f Not running")
+                else:
+                    self.lbl_ollama_status.configure(text=f"Ollama: \u2705 ({len(models)} models)")
+                    if models:
+                        self.combo_model.configure(values=models)
+                        current = self.var_agent_model.get()
+                        if current not in models:
+                            # Prefer coding-oriented models
+                            preferred = ["codellama:latest", "llama3.2:latest", "llama3.1:8b"]
+                            chosen = None
+                            for p in preferred:
+                                if p in models:
+                                    chosen = p
+                                    break
+                            self.var_agent_model.set(chosen or models[0])
+            self.root.after(0, _u)
+        finally:
+            self._ollama_check_lock.release()
 
     def _set_agent_status(self, status):
         self._agent_status = status
@@ -2405,7 +2929,7 @@ class AntigravityAutoclickerApp:
                 mn = pystray.Menu(
                     pystray.MenuItem("Show", lambda: self.root.after(0, self._restore_from_tray)),
                     pystray.MenuItem("Quit", lambda: self.root.after(0, self._on_close)))
-                self._tray_icon = pystray.Icon("antigravity", ic, "Antigravity Autoclicker", mn)
+                self._tray_icon = pystray.Icon("antigravity", ic, "VegaAutoclicker", mn)
                 self._tray_icon.run()
             threading.Thread(target=_mk, daemon=True).start()
         else:
@@ -2439,26 +2963,54 @@ class AntigravityAutoclickerApp:
 
     def _update_status(self):
         if self.engine.running:
-            self.lbl_status.configure(text="\u25cf SCANNING", style="Status.TLabel")
-            self.btn_start.configure(text="\u25a0  STOP", bg=COLORS["red"], fg="#FFFFFF")
+            if self.engine._is_focus_cooldown_active():
+                remaining = self.engine._focus_cooldown_until - time.time()
+                self.lbl_status.configure(text=f"● COOLDOWN ({remaining:.0f}s)", fg=COLORS["yellow"])
+                self._sidebar_status_dot.configure(fg=COLORS["yellow"])
+                self._sidebar_status_text.configure(text="Cooldown")
+            elif self.engine.paused:
+                self.lbl_status.configure(text="● PAUSED", fg=COLORS["yellow"])
+                self._sidebar_status_dot.configure(fg=COLORS["yellow"])
+                self._sidebar_status_text.configure(text="Paused")
+            else:
+                self.lbl_status.configure(text="● SCANNING", fg=COLORS["green"])
+                self._sidebar_status_dot.configure(fg=COLORS["green"])
+                self._sidebar_status_text.configure(text="Scanning")
+            self.btn_start.configure(text="■  STOP SCANNING", bg=COLORS["red"], fg="#FFFFFF")
             self.btn_pause.configure(state=tk.NORMAL)
-            if self.engine.paused:
-                self.lbl_status.configure(text="\u25cf PAUSED", style="StatusOff.TLabel")
         else:
-            self.lbl_status.configure(text="\u25cf STANDBY", style="StatusOff.TLabel")
-            self.btn_start.configure(text="\u25b6  START", bg=COLORS["green"], fg="#000000")
+            self.lbl_status.configure(text="● STANDBY", fg=COLORS["red"])
+            self._sidebar_status_dot.configure(fg=COLORS["red"])
+            self._sidebar_status_text.configure(text="Standby")
+            self.btn_start.configure(text="▶  START SCANNING", bg=COLORS["green"], fg="#000000")
             self.btn_pause.configure(state=tk.DISABLED)
-        self.lbl_clicks.configure(text=f"Clicks: {self.engine.clicks_total}")
+        # Update stat cards
+        self.lbl_clicks.configure(text=str(self.engine.clicks_total))
+        self._var_stat_clicks.set(str(self.engine.clicks_total))
+        self._var_stat_profile.set(self.settings.get("profile", "antigravity"))
         if self.engine.detected_window_title:
             t = self.engine.detected_window_title
-            self.lbl_window.configure(text=f"Window: {t[:47]}..." if len(t) > 50 else f"Window: {t}")
+            short = t[:25] + "..." if len(t) > 28 else t
+            self.lbl_window.configure(text=f"Window: {short}")
+            self._var_stat_window.set(short)
         else:
-            self.lbl_window.configure(text="Window: \u2014")
+            self.lbl_window.configure(text="Window: —")
+            self._var_stat_window.set("—")
         if self.var_debug_overlay.get() != self.overlay.enabled:
             self.overlay.toggle(self.var_debug_overlay.get())
         if not self.agent.running:
             self.btn_agent_start.configure(state=tk.NORMAL)
             self.btn_agent_stop.configure(state=tk.DISABLED)
+        # Update page title based on current page
+        page_titles = {
+            "clicker": ("Auto-Clicker", "Detect and click IDE buttons automatically"),
+            "agent": ("AI Agent", "Autonomous coding supervisor powered by Ollama"),
+            "settings": ("Settings", "Configure detection, AI engine, and system options"),
+            "debug": ("Debug", "Scan visualization and system diagnostics"),
+        }
+        title, subtitle = page_titles.get(self._current_page, ("", ""))
+        self._page_title.configure(text=title)
+        self._page_subtitle.configure(text=subtitle)
         self.root.after(500, self._update_status)
 
     def _toggle_scanner(self):
@@ -2472,6 +3024,25 @@ class AntigravityAutoclickerApp:
 
     def _toggle_pause(self):
         self.engine.toggle_pause()
+
+    def _on_window_focus(self, event):
+        """Triggered when the autoclicker window gains focus.
+        
+        Activates a 5-second click cooldown so the scanner doesn't
+        immediately click the IDE window and steal focus back before
+        the user can interact with autoclicker settings.
+        
+        Only triggers on top-level window focus (not individual widget
+        focus changes within the app), and only when scanner is running.
+        """
+        # Only trigger on the root window, not child widget focus events
+        if event.widget != self.root:
+            return
+        # Only trigger cooldown when scanner is actively running
+        if self.engine.running and not self.engine.paused:
+            # Debounce: don't re-trigger if already in cooldown
+            if not self.engine._is_focus_cooldown_active():
+                self.engine.trigger_focus_cooldown(5.0)
 
     def _on_profile_change(self, event=None):
         self.settings["profile"] = self.var_profile.get()
@@ -2567,21 +3138,37 @@ class AntigravityAutoclickerApp:
         sys.exit(0)
 
     def _poll_file_changes(self):
-        """Check if the script file was modified and prompt to restart."""
+        """Check if the script file was modified and show a non-blocking restart banner.
+        
+        Uses a Toplevel banner instead of messagebox.askyesno to avoid blocking
+        the main thread, which could freeze the UI during active scan/agent operations.
+        """
         try:
             current_mtime = os.path.getmtime(self._script_path)
             if current_mtime != self._script_mtime:
                 self._script_mtime = current_mtime
-                if messagebox.askyesno(
-                    "Update Detected",
-                    "The script has been updated.\nRestart to apply changes?",
-                    parent=self.root
-                ):
-                    self._restart()
-                    return
+                self._show_update_banner()
+                return  # Stop polling — banner handles restart or dismissal
         except Exception:
             pass
         self.root.after(5000, self._poll_file_changes)
+
+    def _show_update_banner(self):
+        """Show a non-blocking banner at the top of the window for script updates."""
+        banner = tk.Frame(self.root, bg=COLORS["yellow"], height=36)
+        banner.pack(fill=tk.X, side=tk.TOP, before=self.root.winfo_children()[0])
+        banner.pack_propagate(False)
+        tk.Label(banner, text="⚡ Script updated! ", font=("Segoe UI", 10, "bold"),
+                 bg=COLORS["yellow"], fg="#000000").pack(side=tk.LEFT, padx=(10, 0))
+        tk.Button(banner, text="Restart Now", font=("Segoe UI", 9, "bold"),
+                  bg="#000000", fg=COLORS["yellow"], relief=tk.FLAT, padx=10, pady=2,
+                  command=self._restart).pack(side=tk.LEFT, padx=5)
+        def _dismiss():
+            banner.destroy()
+            # Resume polling after dismissal
+            self.root.after(5000, self._poll_file_changes)
+        tk.Button(banner, text="✕", font=("Segoe UI", 9), bg=COLORS["yellow"],
+                  fg="#000000", relief=tk.FLAT, padx=6, command=_dismiss).pack(side=tk.RIGHT, padx=5)
 
     def run(self):
         self.root.mainloop()
@@ -2597,7 +3184,7 @@ def main():
         level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S",
         handlers=[RotatingFileHandler(log_file, maxBytes=500*1024, backupCount=2, encoding="utf-8")])
     logging.info("=" * 60)
-    logging.info("Antigravity Autoclicker v2.0 starting...")
+    logging.info("VegaAutoclicker v2.0 starting...")
     app = AntigravityAutoclickerApp()
     app.run()
 

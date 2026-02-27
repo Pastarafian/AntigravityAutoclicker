@@ -1,0 +1,33 @@
+[package]
+name = "antigravity-autoclicker"
+version = "2.0.0"
+description = "VegaAutoclicker — Autonomous Coding Assistant with Auto-Click Engine + AI Agent"
+authors = ["Pastarafian"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.4", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.10.0", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
+tokio = { version = "1", features = ["rt"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+] }

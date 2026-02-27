@@ -26,6 +26,8 @@ python antigravity_clicker.py
 - 🛡️ **Safe** — Failsafe enabled (move mouse to corner to abort), cooldown between clicks, DPI-aware
 - 📜 **Smart scrolling** — Smooth multi-step SendInput scrolling with direction alternation to find off-screen buttons
 - ⌨️ **Typing guard** — Pauses auto-clicking when you're actively typing
+- ⏸️ **Focus cooldown** — 5-second click pause when you focus the autoclicker window, so it doesn't immediately click away
+- 🖥️ **Multi-monitor** — Correct coordinate mapping on multi-monitor setups (virtual screen aware)
 
 ### 🤖 AI Agent (Autonomous Coder)
 - 🧠 **Local LLM supervisor** — Uses Ollama to run a local AI that supervises your coding AI

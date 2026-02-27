@@ -3,8 +3,6 @@ __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
-dist/
-build/
 
 # Logs
 *.log
@@ -30,3 +28,25 @@ Code Examples/
 
 # Gemini
 .gemini/
+
+# Node / Vite
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Build artifacts
+build/
+*.txt
+!requirements.txt
+
+# Environment / Secrets
+.env
+
+# Agent session logs
+core/agent_sessions/
+
+# Backups
+backups/
