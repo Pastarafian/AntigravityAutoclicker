@@ -1,1 +1,1 @@
-# Backend package for VegaAutoclicker
+# Backend package for Antigravity Autoclicker

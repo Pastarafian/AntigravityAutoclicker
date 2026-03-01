@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VegaAutoclicker — Headless Backend Service v2
+Antigravity Autoclicker — Headless Backend Service v2
 ======================================================
 - Multi-provider LLM (DeepSeek, Kimi, Ollama)
 - Upgraded Agent Brain with state machine
@@ -67,7 +67,7 @@ class FileWatcher:
                     pass
     
     def get_changed_files(self) -> list:
-        """Return list of files that changed since startup."""
+        """Return list of files that changed since startup, plus GitHub updates."""
         changed = []
         for path, old_mtime in self.startup_mtimes.items():
             try:
@@ -81,6 +81,17 @@ class FileWatcher:
             for path in glob.glob(pattern):
                 if path not in self.startup_mtimes:
                     changed.append(os.path.basename(path) + ' (new)')
+                    
+        # Check GitHub for updates
+        try:
+            subprocess.run(["git", "fetch", "origin", "main"], cwd=self.project_dir, capture_output=True, timeout=3)
+            res = subprocess.run(["git", "rev-list", "HEAD...origin/main", "--count"], cwd=self.project_dir, capture_output=True, text=True, timeout=2)
+            if res.stdout and int(res.stdout.strip() or "0") > 0:
+                if "GitHub Update Available" not in changed:
+                    changed.insert(0, "GitHub Update Available")
+        except Exception as e:
+            pass
+            
         return changed
 
 # ── DPI Awareness ─────────────────────────────────────────────────────
@@ -155,7 +166,7 @@ for _i, _line in enumerate(_source_lines):
         _debug_overlay_start = _i
     elif _stripped == 'class ScanEngine:':
         _scan_engine_start = _i
-    elif _stripped.startswith('# GUI') and 'Tabbed interface' in _stripped:
+    elif _stripped == 'class AntigravityAutoclickerApp:':
         _gui_start = _i
 
 # Segment 1: everything from first IDE profile up to DebugOverlay
@@ -163,7 +174,7 @@ for _i, _line in enumerate(_source_lines):
 _seg1_start = 118  # After imports/globals, starts at IDE profile definitions
 _seg1_end = (_debug_overlay_start - 2) if _debug_overlay_start else 1548
 _seg2_start = (_scan_engine_start - 4) if _scan_engine_start else 1617  # Include comment header
-_seg2_end = (_gui_start - 1) if _gui_start else 2078
+_seg2_end = (_gui_start - 1) if _gui_start else len(_source_lines)
 
 _core_source = "".join(_source_lines[_seg1_start:_seg1_end]) + "\n" + "".join(_source_lines[_seg2_start:_seg2_end])
 
@@ -306,6 +317,8 @@ _kill_switch_active = False
 # Focus-pause: auto-pause scanner when Antigravity window is focused
 _focus_paused = False
 _was_running_before_focus = False
+_manual_pause_timestamp = 0.0  # Track when user manually pauses/resumes
+_PAUSE_STATE_CHANGE_DELAY = 1.0  # Seconds to ignore focus events after manual pause
 
 _log("Backend service v2 initialized", "system")
 _log(f"OCR available: {OCR_AVAILABLE}", "system")
@@ -634,7 +647,7 @@ class APIHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Not found"}, 404)
 
     def do_POST(self):
-        global _smart_pause_enabled, _focus_paused, _was_running_before_focus
+        global _smart_pause_enabled, _focus_paused, _was_running_before_focus, _manual_pause_timestamp
         path = self.path.split("?")[0]
         body = self._read_body()
 
@@ -648,6 +661,10 @@ class APIHandler(BaseHTTPRequestHandler):
                 _scan_engine.start()
                 _log("Scanner started", "action")
                 _event("scanner_start", {})
+                # Clear focus-pause state when starting fresh
+                _focus_paused = False
+                _was_running_before_focus = False
+                _manual_pause_timestamp = time.time()
             self._send_json({"ok": True})
 
         elif path == "/api/scanner/stop":
@@ -655,32 +672,55 @@ class APIHandler(BaseHTTPRequestHandler):
                 _scan_engine.stop()
                 _log("Scanner stopped", "action")
                 _event("scanner_stop", {})
+            # Clear focus-pause state when stopped
+            _focus_paused = False
+            _was_running_before_focus = False
             self._send_json({"ok": True})
 
         elif path == "/api/scanner/pause":
             _scan_engine.toggle_pause()
+            _manual_pause_timestamp = time.time()
             state = "paused" if _scan_engine.paused else "resumed"
             _log(f"Scanner {state}", "action")
+            
+            # If user manually resumes while focus-paused, clear the focus-pause state
+            # to prevent it from immediately re-pausing or incorrectly resuming later
+            if not _scan_engine.paused:
+                if _focus_paused:
+                    _log("Manual resume cleared focus-pause state", "info")
+                _focus_paused = False
+                _was_running_before_focus = False
+            
             self._send_json({"ok": True, "paused": _scan_engine.paused})
 
         elif path == "/api/scanner/focuspause":
             # Auto-pause when Antigravity window is focused
             focused = body.get("focused", False)
+            now = time.time()
+            
+            # Skip if user just manually paused/resumed (avoid state fighting)
+            if now - _manual_pause_timestamp < _PAUSE_STATE_CHANGE_DELAY:
+                self._send_json({"ok": True, "focus_paused": _focus_paused, "skipped": True})
+                return
+            
             if focused:
                 # Window gained focus — pause scanner temporarily
                 if _scan_engine.running and not _scan_engine.paused:
                     _was_running_before_focus = True
-                    _scan_engine.toggle_pause()
+                    _scan_engine.paused = True
                     _focus_paused = True
                     _log("Scanner paused (window focused)", "action")
                 else:
                     _was_running_before_focus = False
+                    _focus_paused = False
             else:
                 # Window lost focus — resume if we auto-paused
-                if _focus_paused and _was_running_before_focus and _scan_engine.paused:
-                    _scan_engine.toggle_pause()
+                if _focus_paused and _was_running_before_focus:
+                    if _scan_engine.running:
+                        _scan_engine.paused = False
+                        _log("Scanner resumed (window unfocused)", "action")
                     _focus_paused = False
-                    _log("Scanner resumed (window unfocused)", "action")
+                    _was_running_before_focus = False
             self._send_json({"ok": True, "focus_paused": _focus_paused})
 
         # ── Kill Switch ────────────────────────────────────────────
@@ -814,7 +854,8 @@ class APIHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/system/restart":
             _log("Restarting backend...", "system")
-            self._send_json({"ok": True, "message": "Restarting..."})
+            do_update = body.get("update", False)
+            self._send_json({"ok": True, "message": "Updating and restarting..." if do_update else "Restarting..."})
             # Stop everything cleanly
             if _scan_engine.running:
                 _scan_engine.stop()
@@ -823,6 +864,12 @@ class APIHandler(BaseHTTPRequestHandler):
             # Restart the process
             def _do_restart():
                 time.sleep(0.5)  # Let response send
+                if do_update:
+                    try:
+                        subprocess.run(["git", "pull", "origin", "main"], cwd=_PROJECT_DIR, check=True)
+                        _log("Git pull successful", "system")
+                    except Exception as e:
+                        _log(f"Git pull failed: {e}", "error")
                 os.execv(sys.executable, [sys.executable] + sys.argv)
             threading.Thread(target=_do_restart, daemon=True).start()
 

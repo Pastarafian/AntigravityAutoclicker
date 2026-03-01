@@ -226,7 +226,7 @@ class UpgradedAgentBrain:
 
         # Build context-aware system prompt
         system = (
-            "You are an AI coding assistant integrated into the VegaAutoclicker. "
+            "You are an AI coding assistant integrated into the Antigravity Autoclicker. "
             "You help the user plan tasks, discuss strategies, and answer questions. "
             "Be concise and practical."
         )

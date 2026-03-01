@@ -2,7 +2,7 @@
   "name": "antigravity-autoclicker",
   "private": true,
   "version": "2.0.0",
-  "description": "VegaAutoclicker — Autonomous Coding Assistant with Auto-Click Engine + AI Agent",
+  "description": "Antigravity Autoclicker — Autonomous Coding Assistant with Auto-Click Engine + AI Agent",
   "type": "module",
   "scripts": {
     "dev": "vite --port 5179",

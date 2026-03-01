@@ -45,8 +45,14 @@ build/
 # Environment / Secrets
 .env
 
+# Runtime config (user-specific settings)
+core/config.json
+
 # Agent session logs
 core/agent_sessions/
+
+# Test / scratch files
+*.mq5
 
 # Backups
 backups/

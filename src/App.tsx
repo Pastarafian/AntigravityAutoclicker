@@ -159,8 +159,9 @@ export default function App() {
 
   const doRestart = async () => {
     setShowRestartModal(false);
-    showNotification('🔄 Restarting backend...');
-    try { await api('/api/system/restart', 'POST'); } catch { }
+    const hasUpdate = changedFiles.includes('GitHub Update Available');
+    showNotification(hasUpdate ? '🔄 Updating & Restarting...' : '🔄 Restarting backend...');
+    try { await api('/api/system/restart', 'POST', { update: hasUpdate }); } catch { }
     // Wait for restart then reconnect
     setTimeout(() => window.location.reload(), 3000);
   };
@@ -204,7 +205,9 @@ export default function App() {
             )}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setShowRestartModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={doRestart}>🔄 Restart Now</button>
+              <button className="btn btn-primary" onClick={doRestart}>
+                🔄 {changedFiles.includes('GitHub Update Available') ? 'Update & Restart' : 'Restart Now'}
+              </button>
             </div>
           </div>
         </div>

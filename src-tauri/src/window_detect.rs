@@ -1,4 +1,4 @@
-//! Native window detection for VegaAutoclicker.
+//! Native window detection for Antigravity Autoclicker.
 //! Enumerates visible windows, filters by known IDE executables,
 //! and returns ranked matches. ~100x faster than Python's win32gui approach.
 
@@ -40,7 +40,10 @@ const IDE_EXES: &[&str] = &[
 ];
 
 /// Window title substrings to exclude (our own app)
-const EXCLUDE_TITLES: &[&str] = &["\u{26a1} vegaautoclicker", "vegaautoclicker"];
+const EXCLUDE_TITLES: &[&str] = &[
+    "\u{26a1} antigravity autoclicker",
+    "antigravity autoclicker",
+];
 
 /// Get the executable basename for a window's process
 fn get_exe_name(hwnd: HWND) -> Option<String> {

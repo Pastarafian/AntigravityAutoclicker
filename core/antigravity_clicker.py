@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VegaAutoclicker v2.0
+Antigravity Autoclicker v2.0
 =======================
 Autonomous coding assistant with auto-click engine + AI agent brain.
 Detects IDE windows running Antigravity / Gemini (or other AI coding
@@ -131,20 +131,20 @@ PROFILES: Dict[str, dict] = {
             "accept": {
                 "hsv_min": [90, 60, 60],  "hsv_max": [135, 255, 255],
                 "desc": "Blue (#0078D4-style)",
-                "min_w": 60, "max_w": 500, "min_h": 15, "max_h": 70,
-                "min_ratio": 1.5, "max_ratio": 12.0
+                "min_w": 60, "max_w": 800, "min_h": 15, "max_h": 90,
+                "min_ratio": 1.5, "max_ratio": 35.0
             },
             "confirm": {
                 "hsv_min": [90, 60, 60],  "hsv_max": [135, 255, 255],
                 "desc": "Blue",
-                "min_w": 35, "max_w": 250, "min_h": 15, "max_h": 70,
-                "min_ratio": 1.2, "max_ratio": 8.0
+                "min_w": 35, "max_w": 800, "min_h": 15, "max_h": 90,
+                "min_ratio": 1.2, "max_ratio": 35.0
             },
         },
         "ocr_keywords": {
             "run": ["run", "continue", "accept", "execute", "send"],
             "accept": ["accept all", "accept", "apply", "apply all", "yes", "confirm"],
-            "confirm": ["yes", "confirm", "ok", "proceed", "allow"],
+            "confirm": ["yes", "confirm", "ok", "proceed", "allow", "allow this conversation"],
             "busy": ["thinking", "typing", "...", "analyzing", "generating"],
         },
     },
@@ -234,12 +234,14 @@ PROFILES: Dict[str, dict] = {
             },
             "accept": {
                 "hsv_min": [125, 80, 100],  "hsv_max": [155, 255, 220],
-                "desc": "Windsurf Purple"
+                "desc": "Windsurf Purple",
+                "max_w": 800,
+                "max_ratio": 35.0
             },
         },
         "ocr_keywords": {
             "run": ["run", "execute", "continue", "generate", "send", "go"],
-            "accept": ["accept", "accept all", "apply", "yes", "confirm", "apply changes"],
+            "accept": ["accept", "accept all", "apply", "yes", "confirm", "apply changes", "allow", "allow this conversation"],
             "busy": ["windsurf is", "generating", "thinking", "processing", "...", "working"],
         },
     },
@@ -256,14 +258,14 @@ DEFAULT_SETTINGS = {
     "use_ocr": True,
     "cooldown_seconds": 2.0,
     "min_button_area": 600,
-    "max_button_area": 80000,
+    "max_button_area": 120000,
     "min_aspect_ratio": 1.2,
-    "max_aspect_ratio": 12.0,
+    "max_aspect_ratio": 35.0,
     "min_button_width": 35,
     "min_button_height": 15,
     "scan_bottom_portion": 0.75,
     "input_box_clip_px": 100,
-    "typing_cooldown_seconds": 3.0,
+    "typing_cooldown_seconds": 5.0,
     "auto_detect_window": True,
     # v2.0 — Agent & UI settings
     "agent_mode": "build",
@@ -527,6 +529,78 @@ def sendinput_scroll(x: int, y: int, clicks: int = -5, smooth: bool = True):
 
 
 # ——————————————————————————————————————————————————————————————————————
+# IDE WINDOW SAFETY — HARD WHITELIST
+# The autoclicker can ONLY interact with windows from these executables.
+# ——————————————————————————————————————————————————————————————————————
+
+IDE_EXES = {
+    "code.exe", "code - insiders.exe",       # VS Code
+    "antigravity.exe",                         # Antigravity IDE
+    "cursor.exe",                              # Cursor
+    "windsurf.exe",                            # Windsurf / Codeium
+    "kimi.exe",                                # Kimi Code
+}
+
+
+def _get_exe_for_hwnd(hwnd) -> str:
+    """Get the executable name (lowercase) for a window handle."""
+    try:
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        handle = win32api.OpenProcess(0x0400 | 0x0010, False, pid)
+        try:
+            exe_path = win32process.GetModuleFileNameEx(handle, 0)
+            return os.path.basename(exe_path).lower()
+        finally:
+            win32api.CloseHandle(handle)
+    except Exception:
+        return ""
+
+
+def _is_ide_hwnd(hwnd) -> bool:
+    """Check if a window handle belongs to a whitelisted IDE executable."""
+    if not hwnd:
+        return False
+    return _get_exe_for_hwnd(hwnd) in IDE_EXES
+
+
+def is_point_on_ide_window(x: int, y: int) -> bool:
+    """Check if screen coordinates (x, y) are on top of a whitelisted IDE window.
+
+    Uses WindowFromPoint to find which window is at that pixel, then walks
+    the parent chain to find the top-level owner and checks if its process
+    is a whitelisted IDE. Returns False for ANY non-IDE window.
+    """
+    try:
+        point_hwnd = ctypes.windll.user32.WindowFromPoint(
+            ctypes.wintypes.POINT(x, y)
+        )
+        if not point_hwnd:
+            return False
+        # Walk up the parent chain to find the top-level window
+        check_hwnd = point_hwnd
+        for _ in range(20):  # Max depth guard
+            parent = win32gui.GetParent(check_hwnd)
+            if parent == 0 or parent == check_hwnd:
+                break
+            check_hwnd = parent
+        # check_hwnd is now the top-level window — verify it's an IDE
+        return _is_ide_hwnd(check_hwnd)
+    except Exception:
+        return False
+
+
+def is_rect_inside_ide_window(bbox: Tuple[int, int, int, int], ide_rect: Tuple[int, int, int, int]) -> bool:
+    """Check that a bounding box is fully contained within the IDE window rect.
+    
+    This prevents capturing screenshots of areas outside the IDE window,
+    even if the scan region math is slightly off.
+    """
+    bl, bt, br, bb = bbox
+    wl, wt, wr, wb = ide_rect
+    return bl >= wl and bt >= wt and br <= wr and bb <= wb
+
+
+# ——————————————————————————————————————————————————————————————————————
 # WINDOW FINDER — Reliable via EnumWindows
 # ——————————————————————————————————————————————————————————————————————
 
@@ -536,28 +610,12 @@ def find_target_windows(hints: List[str]) -> list:
     
     Returns list of (hwnd, title, rect) tuples, sorted by relevance.
     """
-    # Whitelisted IDE executable names (lowercase)
-    IDE_EXES = {
-        "code.exe", "code - insiders.exe",       # VS Code
-        "antigravity.exe",                         # Antigravity IDE
-        "cursor.exe",                              # Cursor
-        "windsurf.exe",                            # Windsurf / Codeium
-        "kimi.exe",                                # Kimi Code
-    }
+    # Use the global IDE_EXES whitelist
     results = []
 
     def _get_exe_name(hwnd):
-        """Get the executable name for a window's process."""
-        try:
-            _, pid = win32process.GetWindowThreadProcessId(hwnd)
-            handle = win32api.OpenProcess(0x0400 | 0x0010, False, pid)
-            try:
-                exe_path = win32process.GetModuleFileNameEx(handle, 0)
-                return os.path.basename(exe_path).lower()
-            finally:
-                win32api.CloseHandle(handle)
-        except Exception:
-            return ""
+        """Get the executable name for a window's process (uses global helper)."""
+        return _get_exe_for_hwnd(hwnd)
 
     def callback(hwnd, _):
         try:
@@ -569,7 +627,7 @@ def find_target_windows(hints: List[str]) -> list:
             title_lower = title.lower()
 
             # Skip our own GUI / app windows
-            if title_lower.startswith("\u26a1 vegaautoclicker"):
+            if title_lower.startswith("\u26a1 antigravity autoclicker"):
                 return 1
 
             # WHITELIST: Only match windows from known IDE executables
@@ -1106,7 +1164,9 @@ class ChatController:
     """Interacts with the IDE chat input: types text, submits, finds cancel buttons."""
 
     def click_input_area(self, window_rect: Tuple[int, int, int, int], settings: dict = None):
-        """Click into the chat input box at the bottom of the IDE."""
+        """Click into the chat input box at the bottom of the IDE.
+        SAFETY: Only clicks if the target point is on a whitelisted IDE window.
+        """
         settings = settings or {}
         left, top, right, bottom = window_rect
         win_w = right - left
@@ -1117,6 +1177,10 @@ class ChatController:
         else:
             ix = left + win_w // 2
         iy = bottom - input_clip // 2
+        # IDE SAFETY GATE
+        if not is_point_on_ide_window(ix, iy):
+            logging.warning(f"ChatController: BLOCKED click at ({ix},{iy}) — not on IDE window")
+            return
         sendinput_click(ix, iy, hold_ms=30)
         time.sleep(0.15)
 
@@ -1532,7 +1596,13 @@ class AgentBrain:
         self.log(f"🤖 Agent stopped after {self.steps_completed} steps", "warning")
 
     def _handle_loop(self, hwnd, rect):
-        """Handle a spam loop: cancel the current generation, type retry, submit."""
+        """Handle a spam loop: cancel the current generation, type retry, submit.
+        SAFETY: Only clicks if the target is a whitelisted IDE window.
+        """
+        # IDE SAFETY GATE: verify hwnd is an IDE before interacting
+        if not _is_ide_hwnd(hwnd):
+            self.log(f"_handle_loop: BLOCKED — hwnd={hwnd} is not a whitelisted IDE", "error")
+            return
         try:
             win32gui.SetForegroundWindow(hwnd)
             time.sleep(0.3)
@@ -1541,8 +1611,12 @@ class AgentBrain:
         # Try to click the red cancel button
         cancel_pos = self.chat_controller.find_cancel_button(rect, self.settings)
         if cancel_pos:
-            sendinput_click(cancel_pos[0], cancel_pos[1], hold_ms=60)
-            self.log("Clicked cancel button", "info")
+            # Verify cancel button position is on an IDE window
+            if is_point_on_ide_window(cancel_pos[0], cancel_pos[1]):
+                sendinput_click(cancel_pos[0], cancel_pos[1], hold_ms=60)
+                self.log("Clicked cancel button", "info")
+            else:
+                self.log(f"BLOCKED cancel click at ({cancel_pos[0]},{cancel_pos[1]}): not on IDE", "error")
             time.sleep(2.0)
         else:
             self.log("No cancel button found, pressing Escape", "info")
@@ -1692,13 +1766,17 @@ class ScanEngine:
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.log_callback(f"[{timestamp}] {msg}", tag)
 
-    def _check_cooldown(self, btn_type: str) -> bool:
+    def _check_cooldown(self, btn_type: str, hwnd: int = 0) -> bool:
         """Return True if enough time has passed since last click of this type."""
         cooldown = self.settings.get("cooldown_seconds", 1.5)
-        last = self.last_click_times.get(btn_type, 0)
+        key = f"{hwnd}_{btn_type}" if hwnd else btn_type
+        last = self.last_click_times.get(key, 0)
         return (time.time() - last) >= cooldown
 
-    def _record_click(self, btn_type: str):
+    def _record_click(self, btn_type: str, hwnd: int = 0):
+        key = f"{hwnd}_{btn_type}" if hwnd else btn_type
+        self.last_click_times[key] = time.time()
+        # Also update global for the status API
         self.last_click_times[btn_type] = time.time()
         self.clicks_total += 1
 
@@ -1722,11 +1800,11 @@ class ScanEngine:
         appear to 'stop randomly'.
         """
         try:
-            # Only check the most critical typing keys (not every key)
             typing_keys = (
                 list(range(0x41, 0x5B)) +    # A-Z
                 list(range(0x30, 0x3A)) +    # 0-9
-                [0x20, 0x08, 0x0D]           # Space, Backspace, Enter
+                list(range(0x21, 0x29)) +    # PG_UP, PG_DN, END, HOME, ARROWS
+                [0x20, 0x08, 0x0D, 0x09]     # Space, Backspace, Enter, Tab
             )
             for vk in typing_keys:
                 state = ctypes.windll.user32.GetAsyncKeyState(vk)
@@ -1734,8 +1812,9 @@ class ScanEngine:
                     self._last_key_time = time.time()
                     return True
             
-            # Very short cooldown — only skip the current scan cycle
-            if (time.time() - self._last_key_time) < 0.5:
+            # Cooldown — avoid stealing focus while typing or shortly after
+            cooldown = self.settings.get("typing_cooldown_seconds", 5.0)
+            if (time.time() - self._last_key_time) < cooldown:
                 return True
                 
         except Exception:
@@ -1846,21 +1925,50 @@ class ScanEngine:
             return changed
         except Exception:
             return False
+    def _is_mouse_in_region(self, region: Tuple[int, int, int, int]) -> bool:
+        """Check if the mouse cursor is hovering over the scan region."""
+        try:
+            x, y = win32api.GetCursorPos()
+            left, top, right, bottom = region
+            return left <= x <= right and top <= y <= bottom
+        except Exception:
+            return False
 
-    def _smart_scroll_down(self, frame, scan_bbox):
+    def _smart_scroll_down(self, frame, scan_bbox, hwnd=None, force=False):
         """Scroll the chat down periodically to keep it at the bottom.
         
         Scrolls every 2 seconds with 5 notches to keep up with streaming output.
+        HARD SAFETY: Only scrolls if the target point is on an IDE window.
         """
         now = time.time()
-        if now - self._last_scroll_time < 2.0:
+        
+        # ACTIVE WINDOW GUARD: Only scroll if the window is actually currently active/foreground.
+        # This prevents the mouse from teleporting around to scroll background IDEs.
+        if hwnd and hwnd != win32gui.GetForegroundWindow() and not force:
             return
+
+        if now - self._last_scroll_time < 2.0 and not force:
+            return
+            
+        # HOVER GUARD: Pause scrolling if user's mouse is actively over the chat area
+        if not force and self._is_mouse_in_region(scan_bbox):
+            return
+            
+        # CONTENT GUARD: Only scroll down if the text actually changed (streaming output)
+        if not force and not self._has_content_changed(frame, scan_bbox):
+            return
+
         
         try:
             scan_left, scan_top, scan_right, scan_bottom = scan_bbox
             sx = (scan_left + scan_right) // 2
             sy = scan_top + int((scan_bottom - scan_top) * 0.75)  # Lower 75% of scan area
             
+            # === IDE SAFETY GATE: Only scroll if the target point is on an IDE window ===
+            if not is_point_on_ide_window(sx, sy):
+                logging.debug(f"Scroll blocked: ({sx},{sy}) is not on an IDE window")
+                return
+
             # Save → scroll → restore in one tight block
             orig_x, orig_y = win32api.GetCursorPos()
             sendinput_scroll(sx, sy, clicks=-5, smooth=False)
@@ -1871,53 +1979,55 @@ class ScanEngine:
             logging.debug(f"Scroll error: {e}")
 
     def _perform_click(self, screen_x: int, screen_y: int, detection: ButtonDetection, hwnd=None):
-        """Click the detected button with minimal disruption.
+        """Click the detected button natively.
         
-        Full save/restore cycle:
-        1. Save current foreground window + cursor position
-        2. Activate target IDE window
-        3. Click the button
-        4. Restore cursor position + refocus original window
-        
-        Total operation time: ~150ms — barely noticeable to the user.
+        HARD SAFETY: Will ONLY click if the screen coordinates physically map
+        to a whitelisted IDE window on your desktop.
         """
-        if not self._check_cooldown(detection.btn_type):
+        if not self._check_cooldown(detection.btn_type, hwnd):
+            return False
+
+        # === IDE SAFETY GATE 1: Verify the target hwnd is an IDE ===
+        if hwnd and not _is_ide_hwnd(hwnd):
+            self.log(f"BLOCKED click: hwnd={hwnd} is NOT a whitelisted IDE", "error")
+            return False
+
+        # === IDE SAFETY GATE 2: Verify the click point is on an IDE window ===
+        if not is_point_on_ide_window(screen_x, screen_y):
+            self.log(f"BLOCKED click at ({screen_x},{screen_y}): not on an IDE window", "error")
             return False
 
         try:
             # === SAVE STATE ===
-            orig_hwnd = win32gui.GetForegroundWindow()
-            orig_title = win32gui.GetWindowText(orig_hwnd)[:40] if orig_hwnd else 'None'
             orig_x, orig_y = win32api.GetCursorPos()
-            self.log(f"Click: save state — FG={orig_title} cursor=({orig_x},{orig_y})", "info")
+            orig_fg_hwnd = win32gui.GetForegroundWindow()
 
-            # === ACTIVATE TARGET WINDOW (if needed) ===
-            needs_focus_change = hwnd and hwnd != orig_hwnd
-            if needs_focus_change:
-                try:
-                    ok = self._activate_window(hwnd)
-                    self.log(f"Click: activate IDE hwnd={hwnd} — {'OK' if ok else 'FAIL'}", "info")
-                    time.sleep(0.05)  # Brief settle time
-                except Exception as e:
-                    self.log(f"Click: activate IDE EXCEPTION: {e}", "error")
+            # Pre-activate the target window if it isn't the foreground window.
+            # Electron/Chromium apps often swallow the first physical click if the window is inactive.
+            if hwnd and hwnd != orig_fg_hwnd:
+                self._activate_window(hwnd)
+                time.sleep(0.05)
 
             # === CLICK (atomic: move → down → up) ===
-            sendinput_click(screen_x, screen_y, hold_ms=30)
+            sendinput_click(screen_x, screen_y, hold_ms=15)
 
             # === RESTORE STATE ===
-            # Electron apps need ~80ms to process the click through their JS event loop
-            time.sleep(0.08)
+            # Electron apps need a tiny moment to process the mousedown/up events through their JS event loop
+            time.sleep(0.05)
             restore_mouse(orig_x, orig_y)
+            
+            # Restore keyboard focus to whatever the user was looking at
+            if orig_fg_hwnd:
+                self._activate_window(orig_fg_hwnd)
+                
+            # As requested, physically click where the mouse was resting to refocus the text input
+            # Safety: ONLY do this if the mouse is over an IDE window to avoid misclicking other apps
+            if is_point_on_ide_window(orig_x, orig_y):
+                # Ensure the OS registered the mouse jump back before firing the click
+                time.sleep(0.04)
+                sendinput_click(orig_x, orig_y, hold_ms=25)
 
-            # Refocus original window (only if we changed focus)
-            if needs_focus_change and orig_hwnd:
-                try:
-                    ok = self._activate_window(orig_hwnd)
-                    self.log(f"Click: restore FG={orig_title} — {'OK' if ok else 'FAIL'}", "info")
-                except Exception as e:
-                    self.log(f"Click: restore EXCEPTION: {e}", "error")
-
-            self._record_click(detection.btn_type)
+            self._record_click(detection.btn_type, hwnd)
             self.log(
                 f"✓ CLICKED {detection.btn_type.upper()} at ({screen_x},{screen_y}) "
                 f"[{detection.method}, {detection.confidence:.0%}]",
@@ -1928,7 +2038,7 @@ class ScanEngine:
             if TOAST_AVAILABLE and (time.time() - self._last_toast_time) >= 30.0:
                 try:
                     _toaster.show_toast(
-                        "VegaAutoclicker",
+                        "Antigravity Autoclicker",
                         f"Clicked: {detection.btn_type}",
                         duration=2,
                         threaded=True
@@ -1945,28 +2055,19 @@ class ScanEngine:
 
     @staticmethod
     def _activate_window(hwnd):
-        """Bring a window to the foreground using the AttachThreadInput trick.
-        
-        SetForegroundWindow() silently fails when called from a background process.
-        The workaround is to attach our thread to the TARGET window's thread,
-        call SetForegroundWindow, then detach. This works reliably.
-        """
+        """Bring a window to the foreground using the AttachThreadInput trick."""
         try:
-            # Check if window still exists
             if not win32gui.IsWindow(hwnd):
-                logging.debug(f"_activate_window: hwnd={hwnd} no longer valid")
                 return False
 
-            # Restore from minimized state if needed
             if win32gui.IsIconic(hwnd):
-                win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+                win32gui.ShowWindow(hwnd, 9)
 
             target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
             curr_thread = win32api.GetCurrentThreadId()
 
             attached = False
             if target_thread != curr_thread:
-                # Attach to TARGET window's thread (not foreground window)
                 if ctypes.windll.user32.AttachThreadInput(curr_thread, target_thread, True):
                     attached = True
                 try:
@@ -1977,14 +2078,12 @@ class ScanEngine:
             else:
                 win32gui.SetForegroundWindow(hwnd)
 
-            # Verify activation
             time.sleep(0.01)
             actual_fg = win32gui.GetForegroundWindow()
             return actual_fg == hwnd
         except Exception:
-            # Fallback: try ShowWindow + BringWindowToTop
             try:
-                win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+                win32gui.ShowWindow(hwnd, 9)
                 win32gui.BringWindowToTop(hwnd)
                 win32gui.SetForegroundWindow(hwnd)
             except Exception:
@@ -2036,147 +2135,161 @@ class ScanEngine:
 
                 scan_count += 1
 
-                # Use the first (best) matching window
-                hwnd, title, rect = windows[0]
-                self.detected_window_title = title
+                clicked_anything = False
+                
+                # Iterate through ALL matching windows
+                for hwnd, title, rect in windows:
+                        self.detected_window_title = title
 
-                # AUTO-FOCUS: Bring IDE to foreground when first detected or changed
-                # This ensures buttons are visible for screen capture
-                if hwnd != getattr(self, '_last_focused_hwnd', None):
-                    self._last_focused_hwnd = hwnd
-                    try:
-                        self._activate_window(hwnd)
-                        self.log(f"Auto-focused IDE: {title[:50]}", "success")
-                        time.sleep(0.3)  # Let window fully render
-                        # Refresh rect after focus (window might have moved)
-                        rect = win32gui.GetWindowRect(hwnd)
-                    except Exception as e:
-                        self.log(f"Auto-focus failed: {e}", "warning")
+                        # (No auto-focus: if windows are side-by-side, they will just be scanned where they are)
 
-                if scan_count % 30 == 1:
-                    w = rect[2] - rect[0]
-                    h = rect[3] - rect[1]
-                    self.log(f"Scanning: {title[:50]}... ({w}x{h}, {len(windows)} match{'es' if len(windows) > 1 else ''})", "info")
+                        if scan_count % 30 == 1:
+                            w = rect[2] - rect[0]
+                            h = rect[3] - rect[1]
+                            self.log(f"Scanning: {title[:50]}... ({w}x{h}, {len(windows)} match{'es' if len(windows) > 1 else ''})", "info")
 
-                # Auto-detect profile from window title
-                if self.settings.get("auto_detect_window", True):
-                    detected_key = auto_detect_profile(title)
-                    if detected_key and detected_key != self.settings.get("profile"):
-                        self.detected_profile = detected_key
-                        profile = PROFILES.get(detected_key, profile)
+                        # Auto-detect profile from window title
+                        if self.settings.get("auto_detect_window", True):
+                            detected_key = auto_detect_profile(title)
+                            if detected_key and detected_key != self.settings.get("profile"):
+                                self.detected_profile = detected_key
+                                profile = PROFILES.get(detected_key, profile)
 
-                # Calculate scan region
-                scan_bbox = self._get_scan_region(rect)
-                self.last_scan_region = scan_bbox
-                scan_left, scan_top, scan_right, scan_bottom = scan_bbox
+                        # Calculate scan region
+                        scan_bbox = self._get_scan_region(rect)
+                        self.last_scan_region = scan_bbox
+                        scan_left, scan_top, scan_right, scan_bottom = scan_bbox
 
-                # TYPING GUARD: Only pause if this IDE window is foreground
-                try:
-                    fg = win32gui.GetForegroundWindow()
-                    if fg == hwnd and self._is_user_typing():
-                        time.sleep(0.3)
-                        continue
-                except Exception:
-                    pass
+                        # TYPING GUARD: Pause scanning if the user is typing ANYWHERE.
+                        # This prevents the autoclicker from stealing focus mid-sentence.
+                        try:
+                            if self._is_user_typing():
+                                time.sleep(0.3)
+                                continue
+                        except Exception:
+                            pass
 
-                if scan_right <= scan_left or scan_bottom <= scan_top:
-                    time.sleep(interval)
-                    continue
+                        if scan_right <= scan_left or scan_bottom <= scan_top:
+                            time.sleep(interval)
+                            continue
 
-                # Capture screenshot of the scan region
-                try:
-                    screenshot = ImageGrab.grab(bbox=scan_bbox)
-                    frame = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-                except Exception as e:
-                    logging.debug(f"Screenshot error: {e}")
-                    time.sleep(interval)
-                    continue
+                        # Capture screenshot of the scan region
+                        # SAFETY: Clamp scan_bbox to the IDE window rect to prevent
+                        # capturing anything outside the IDE window
+                        try:
+                            clamped_bbox = (
+                                max(scan_left, rect[0]),
+                                max(scan_top, rect[1]),
+                                min(scan_right, rect[2]),
+                                min(scan_bottom, rect[3]),
+                            )
+                            if not is_rect_inside_ide_window(clamped_bbox, rect):
+                                logging.debug(f"Scan region outside IDE window, skipping")
+                                time.sleep(interval)
+                                continue
+                            screenshot = ImageGrab.grab(bbox=clamped_bbox)
+                            # Update scan offsets to match clamped box
+                            scan_left, scan_top, scan_right, scan_bottom = clamped_bbox
+                            frame = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+                        except Exception as e:
+                            logging.debug(f"Screenshot error: {e}")
+                            time.sleep(interval)
+                            continue
 
-                if frame is None or frame.size == 0:
-                    time.sleep(interval)
-                    continue
+                        if frame is None or frame.size == 0:
+                            time.sleep(interval)
+                            continue
 
-                # Detect buttons via color
-                detections = detect_buttons_color(frame, profile, self.settings)
+                        # Detect buttons via color
+                        detections = detect_buttons_color(frame, profile, self.settings)
 
-                # If color detection found nothing, try template matching (fast, ~2ms)
-                if not detections and self.settings.get("use_ocr", True):
-                    detections = detect_buttons_template(
-                        frame, profile, self.settings
-                    )
+                        # If color detection found nothing, try template matching (fast, ~2ms)
+                        if not detections and self.settings.get("use_ocr", True):
+                            detections = detect_buttons_template(
+                                frame, profile, self.settings
+                            )
 
-                # Merge overlapping detections
-                detections = merge_detections(detections)
+                        # Merge overlapping detections
+                        detections = merge_detections(detections)
 
-                if scan_count % 30 == 1 and not detections:
-                    self.log(f"Scan #{scan_count}: No buttons in region ({scan_left},{scan_top})-({scan_right},{scan_bottom})", "info")
+                        if scan_count % 30 == 1 and not detections:
+                            self.log(f"Scan #{scan_count}: No buttons in region ({scan_left},{scan_top})-({scan_right},{scan_bottom})", "info")
 
-                # Click the best detection
-                if detections:
-                    # For "run" buttons: pick the NARROWEST one.
-                    # "Run" is always shorter than "Always run" or "Ask every time".
-                    # This handles any DPI scaling since we compare relative widths.
-                    run_detections = [d for d in detections if d.btn_type == "run"]
-                    other_detections = [d for d in detections if d.btn_type != "run"]
-                    
-                    if len(run_detections) > 1:
-                        # Multiple run buttons — pick narrowest (that's the real "Run")
-                        run_detections.sort(key=lambda d: d.w)
-                        best_run = run_detections[0]
-                        self.log(f"Multiple run buttons: picked narrowest ({best_run.w}px) over wider ({run_detections[-1].w}px)", "info")
-                    elif len(run_detections) == 1:
-                        best_run = run_detections[0]
-                    else:
-                        best_run = None
-                    
-                    # Pick the best overall detection
-                    if other_detections:
-                        best = other_detections[0]  # Non-run buttons get priority (busy, accept, etc.)
-                    elif best_run:
-                        best = best_run
-                    else:
-                        best = detections[0]
-                    
-                    # FINAL: "Always run" guard — if this is the ONLY run button and
-                    # it's suspiciously wide, skip it. Normal "Run" ≈ 50-90px.
-                    should_click = True
-                    if best.btn_type == "run" and len(run_detections) == 1:
-                        if best.w > 100:
-                            self.log(f"Skipping wide Run button ({best.w}px) — likely 'Always run'", "warning")
-                            should_click = False
-                                
-                    if should_click:
-                        # Convert frame-relative coords to screen coords
-                        screen_x = scan_left + best.cx
-                        screen_y = scan_top + best.cy
-                        
-                        if best.btn_type == "busy":
-                            # AI is generating — scroll down only if new content appeared
-                            self._smart_scroll_down(frame, scan_bbox)
-                            time.sleep(1.0)
+                        # Click the best detection
+                        if detections:
+                            # For "run" buttons: pick the NARROWEST one.
+                            # "Run" is always shorter than "Always run" or "Ask every time".
+                            # This handles any DPI scaling since we compare relative widths.
+                            run_detections = [d for d in detections if d.btn_type == "run"]
+                            other_detections = [d for d in detections if d.btn_type != "run"]
+
+                            if len(run_detections) > 1:
+                                # Multiple run buttons — pick narrowest (that's the real "Run")
+                                run_detections.sort(key=lambda d: d.w)
+                                best_run = run_detections[0]
+                                self.log(f"Multiple run buttons: picked narrowest ({best_run.w}px) over wider ({run_detections[-1].w}px)", "info")
+                            elif len(run_detections) == 1:
+                                best_run = run_detections[0]
+                            else:
+                                best_run = None
+
+                            # Pick the best overall detection
+                            if other_detections:
+                                # For allow/confirm buttons, the larger one is usually "allow for this conversation"
+                                # We sort by area descending to ensure we click the biggest one.
+                                other_detections.sort(key=lambda d: d.w * d.h, reverse=True)
+                                best = other_detections[0]  # Non-run buttons get priority (busy, accept, etc.)
+                            elif best_run:
+                                best = best_run
+                            else:
+                                best = detections[0]
+
+                            # FINAL: "Always run" guard — if this is the ONLY run button and
+                            # it's suspiciously wide, skip it. Normal "Run" ≈ 50-90px.
+                            should_click = True
+                            if best.btn_type == "run" and len(run_detections) == 1:
+                                if best.w > 100:
+                                    self.log(f"Skipping wide Run button ({best.w}px) — likely 'Always run'", "warning")
+                                    should_click = False
+
+                            if should_click:
+                                # Convert frame-relative coords to screen coords
+                                screen_x = scan_left + best.cx
+                                screen_y = scan_top + best.cy
+
+                                if best.btn_type == "busy":
+                                    # AI is generating — scroll down only if new content appeared
+                                    self._smart_scroll_down(frame, scan_bbox, hwnd)
+                                    time.sleep(1.0)
+                                else:
+                                    # === ONLY move mouse here — confirmed button to click ===
+                                    self._perform_click(screen_x, screen_y, best, hwnd)
+                                    # Track click rate for loop detection
+                                    if self.loop_detector.record_click(best.btn_type):
+                                        self.log("⚠️ Rapid clicking detected (4+ in 60s)!", "warning")
+                                    # Short pause after click to let UI update
+                                    time.sleep(0.5)
+                                    clicked_anything = True
+                                    break  # Break out of window loop if we clicked something
+                            else:
+                                # Rejected detection, sleep and try again
+                                pass
                         else:
-                            # === ONLY move mouse here — confirmed button to click ===
-                            self._perform_click(screen_x, screen_y, best, hwnd)
-                            # Track click rate for loop detection
-                            if self.loop_detector.record_click(best.btn_type):
-                                self.log("⚠️ Rapid clicking detected (4+ in 60s)!", "warning")
-                            # Short pause after click to let UI update
-                            time.sleep(0.5)
-                    else:
-                        # Rejected detection, sleep and try again
-                        time.sleep(interval)
-                else:
-                    # No buttons detected — DO NOT move the mouse or scroll randomly.
-                    # Only scroll down if we detect new content at the bottom of the chat
-                    # (i.e., the AI is still generating and chat needs to follow along).
-                    self._smart_scroll_down(frame, scan_bbox)
+                            # No buttons detected — DO NOT move the mouse or scroll randomly.
+                            # Only scroll down if we detect new content at the bottom of the chat
+                            # (i.e., the AI is still generating and chat needs to follow along).
+                            self._smart_scroll_down(frame, scan_bbox, hwnd)
+                
+                if not clicked_anything:
                     time.sleep(interval)
+                else:
+                    time.sleep(0.5)
 
             except Exception as e:
                 logging.error(f"Scan loop error: {e}", exc_info=True)
                 self.log(f"Scan error: {e}", "error")
                 time.sleep(1.0)
-
+                
         self.running = False
 
 
@@ -2225,7 +2338,7 @@ class AntigravityAutoclickerApp:
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("⚡ VegaAutoclicker v2.0")
+        self.root.title("⚡ Antigravity Autoclicker v2.0")
         self.root.geometry("960x750")
         self.root.minsize(800, 600)
         self.root.configure(bg=COLORS["bg_dark"])
@@ -2280,7 +2393,7 @@ class AntigravityAutoclickerApp:
         self._poll_hotkey()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.bind("<FocusIn>", self._on_window_focus)
-        self._log_info("\u26a1 VegaAutoclicker v2.0 ready.", "info")
+        self._log_info("\u26a1 Antigravity Autoclicker v2.0 ready.", "info")
         threading.Thread(target=self._check_ollama, daemon=True).start()
 
         # File watcher for auto-restart on updates
@@ -2531,11 +2644,18 @@ class AntigravityAutoclickerApp:
         ctrl = tk.Frame(parent, bg=COLORS["bg_dark"])
         ctrl.pack(fill=tk.X, pady=(0, 12))
 
-        self.btn_start = tk.Button(ctrl, text="▶  START SCANNING", font=(FONT_MAIN, 12, "bold"),
+        self.btn_start = tk.Button(ctrl, text="▶ START", font=(FONT_MAIN, 11, "bold"),
             bg=COLORS["green"], fg="#000000", activebackground="#0a8c5f",
-            relief=tk.FLAT, padx=28, pady=10, command=self._toggle_scanner, cursor="hand2")
+            relief=tk.FLAT, padx=22, pady=10, command=self._start_scanner, cursor="hand2")
         self.btn_start.pack(side=tk.LEFT, padx=(0, 8))
-        self.btn_pause = tk.Button(ctrl, text="⏸ Pause", font=(FONT_MAIN, 10),
+
+        self.btn_stop = tk.Button(ctrl, text="■ STOP", font=(FONT_MAIN, 11, "bold"),
+            bg=COLORS["bg_card"], fg=COLORS["red"], activebackground=COLORS["bg_card_hover"],
+            relief=tk.FLAT, padx=14, pady=10, command=self._stop_scanner,
+            state=tk.DISABLED, cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1)
+        self.btn_stop.pack(side=tk.LEFT, padx=(0, 8))
+
+        self.btn_pause = tk.Button(ctrl, text="⏸ Pause", font=(FONT_MAIN, 11),
             bg=COLORS["bg_card"], fg=COLORS["yellow"], activebackground=COLORS["bg_card_hover"],
             relief=tk.FLAT, padx=14, pady=10, command=self._toggle_pause,
             state=tk.DISABLED, cursor="hand2", highlightbackground=COLORS["border"], highlightthickness=1)
@@ -2959,7 +3079,7 @@ class AntigravityAutoclickerApp:
                 mn = pystray.Menu(
                     pystray.MenuItem("Show", lambda: self.root.after(0, self._restore_from_tray)),
                     pystray.MenuItem("Quit", lambda: self.root.after(0, self._on_close)))
-                self._tray_icon = pystray.Icon("antigravity", ic, "VegaAutoclicker", mn)
+                self._tray_icon = pystray.Icon("antigravity", ic, "Antigravity Autoclicker", mn)
                 self._tray_icon.run()
             threading.Thread(target=_mk, daemon=True).start()
         else:
@@ -3006,14 +3126,23 @@ class AntigravityAutoclickerApp:
                 self.lbl_status.configure(text="● SCANNING", fg=COLORS["green"])
                 self._sidebar_status_dot.configure(fg=COLORS["green"])
                 self._sidebar_status_text.configure(text="Scanning")
-            self.btn_start.configure(text="■  STOP SCANNING", bg=COLORS["red"], fg="#FFFFFF")
+            
+            self.btn_start.configure(state=tk.DISABLED, bg=COLORS["bg_card"], fg=COLORS["text_dim"])
+            self.btn_stop.configure(state=tk.NORMAL)
             self.btn_pause.configure(state=tk.NORMAL)
+            if self.engine.paused:
+                self.btn_pause.configure(text="▶ Resume", fg=COLORS["green"])
+            else:
+                self.btn_pause.configure(text="⏸ Pause", fg=COLORS["yellow"])
         else:
             self.lbl_status.configure(text="● STANDBY", fg=COLORS["red"])
             self._sidebar_status_dot.configure(fg=COLORS["red"])
             self._sidebar_status_text.configure(text="Standby")
-            self.btn_start.configure(text="▶  START SCANNING", bg=COLORS["green"], fg="#000000")
-            self.btn_pause.configure(state=tk.DISABLED)
+            
+            self.btn_start.configure(state=tk.NORMAL, bg=COLORS["green"], fg="#000000")
+            self.btn_stop.configure(state=tk.DISABLED)
+            self.btn_pause.configure(state=tk.DISABLED, text="⏸ Pause")
+        
         # Update stat cards
         self.lbl_clicks.configure(text=str(self.engine.clicks_total))
         self._var_stat_clicks.set(str(self.engine.clicks_total))
@@ -3043,14 +3172,17 @@ class AntigravityAutoclickerApp:
         self._page_subtitle.configure(text=subtitle)
         self.root.after(500, self._update_status)
 
-    def _toggle_scanner(self):
-        if self.engine.running:
-            self.engine.stop()
-        else:
+    def _start_scanner(self):
+        if not self.engine.running:
             self._save_settings()
             self.engine.settings = self.settings
             self.engine.start()
-        self.var_running.set(self.engine.running)
+            self.var_running.set(True)
+
+    def _stop_scanner(self):
+        if self.engine.running:
+            self.engine.stop()
+            self.var_running.set(False)
 
     def _toggle_pause(self):
         self.engine.toggle_pause()
@@ -3168,37 +3300,143 @@ class AntigravityAutoclickerApp:
         sys.exit(0)
 
     def _poll_file_changes(self):
-        """Check if the script file was modified and show a non-blocking restart banner.
+        """Check for local file changes AND remote git updates.
         
-        Uses a Toplevel banner instead of messagebox.askyesno to avoid blocking
-        the main thread, which could freeze the UI during active scan/agent operations.
+        - Every 5s: check if the script file mtime changed (local edits)
+        - Every 60s: run 'git fetch' in background and check if branch is behind
+        Shows a popup dialog when updates are detected.
         """
         try:
+            # 1) Local file mtime check
             current_mtime = os.path.getmtime(self._script_path)
             if current_mtime != self._script_mtime:
                 self._script_mtime = current_mtime
-                self._show_update_banner()
-                return  # Stop polling — banner handles restart or dismissal
+                self._show_update_popup("local")
+                return  # Stop polling — popup handles restart or dismissal
         except Exception:
             pass
+
+        # 2) Periodic git remote check (every 60s)
+        now = time.time()
+        last_git_check = getattr(self, '_last_git_check', 0)
+        if now - last_git_check >= 60:
+            self._last_git_check = now
+            threading.Thread(target=self._check_git_updates, daemon=True).start()
+        
         self.root.after(5000, self._poll_file_changes)
 
-    def _show_update_banner(self):
-        """Show a non-blocking banner at the top of the window for script updates."""
-        banner = tk.Frame(self.root, bg=COLORS["yellow"], height=36)
-        banner.pack(fill=tk.X, side=tk.TOP, before=self.root.winfo_children()[0])
-        banner.pack_propagate(False)
-        tk.Label(banner, text="⚡ Script updated! ", font=("Segoe UI", 10, "bold"),
-                 bg=COLORS["yellow"], fg="#000000").pack(side=tk.LEFT, padx=(10, 0))
-        tk.Button(banner, text="Restart Now", font=("Segoe UI", 9, "bold"),
-                  bg="#000000", fg=COLORS["yellow"], relief=tk.FLAT, padx=10, pady=2,
-                  command=self._restart).pack(side=tk.LEFT, padx=5)
-        def _dismiss():
-            banner.destroy()
-            # Resume polling after dismissal
+    def _check_git_updates(self):
+        """Background thread: git fetch + check if behind remote."""
+        try:
+            repo_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(repo_dir)
+            # Try repo root (parent of core/)
+            git_dir = parent_dir if os.path.isdir(os.path.join(parent_dir, ".git")) else repo_dir
+            
+            subprocess.run(
+                ["git", "fetch"],
+                cwd=git_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=15
+            )
+            result = subprocess.run(
+                ["git", "status", "-uno"],
+                cwd=git_dir,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if "Your branch is behind" in result.stdout:
+                # Schedule popup on main thread
+                self.root.after(0, lambda: self._show_update_popup("git"))
+        except Exception as e:
+            logging.debug(f"Git update check failed: {e}")
+
+    def _do_git_pull_and_restart(self):
+        """Pull latest from git and restart the app."""
+        try:
+            repo_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(repo_dir)
+            git_dir = parent_dir if os.path.isdir(os.path.join(parent_dir, ".git")) else repo_dir
+            
+            result = subprocess.run(
+                ["git", "pull"],
+                cwd=git_dir,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            self._log_info(f"Git pull: {result.stdout.strip()}", "success")
+        except Exception as e:
+            self._log_info(f"Git pull failed: {e}", "error")
+        self._restart()
+
+    def _show_update_popup(self, source="local"):
+        """Show a centered popup window with Update & Restart / Stay Open options."""
+        # Prevent duplicate popups
+        if getattr(self, '_update_popup_open', False):
+            return
+        self._update_popup_open = True
+
+        popup = tk.Toplevel(self.root)
+        popup.title("Update Available")
+        popup.configure(bg=COLORS["bg_panel"])
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+        popup.grab_set()
+
+        # Size and center
+        pw, ph = 420, 220
+        rx = self.root.winfo_x() + (self.root.winfo_width() - pw) // 2
+        ry = self.root.winfo_y() + (self.root.winfo_height() - ph) // 2
+        popup.geometry(f"{pw}x{ph}+{rx}+{ry}")
+
+        # Icon
+        tk.Label(popup, text="⚡", font=("Segoe UI Emoji", 36),
+                 bg=COLORS["bg_panel"], fg=COLORS["accent"]).pack(pady=(18, 5))
+
+        # Message
+        if source == "git":
+            msg = "A newer version is available from the repository."
+        else:
+            msg = "The script files have been updated on disk."
+        tk.Label(popup, text=msg, font=("Segoe UI", 11),
+                 bg=COLORS["bg_panel"], fg=COLORS["text"], wraplength=360).pack(pady=(0, 5))
+        tk.Label(popup, text="Would you like to update and restart?",
+                 font=("Segoe UI", 10), bg=COLORS["bg_panel"],
+                 fg=COLORS["text_dim"]).pack(pady=(0, 12))
+
+        btn_frame = tk.Frame(popup, bg=COLORS["bg_panel"])
+        btn_frame.pack(pady=(0, 15))
+
+        def _on_update():
+            popup.destroy()
+            self._update_popup_open = False
+            if source == "git":
+                threading.Thread(target=self._do_git_pull_and_restart, daemon=True).start()
+            else:
+                self._restart()
+
+        def _on_stay():
+            popup.destroy()
+            self._update_popup_open = False
+            # Resume file polling
             self.root.after(5000, self._poll_file_changes)
-        tk.Button(banner, text="✕", font=("Segoe UI", 9), bg=COLORS["yellow"],
-                  fg="#000000", relief=tk.FLAT, padx=6, command=_dismiss).pack(side=tk.RIGHT, padx=5)
+
+        tk.Button(btn_frame, text="🔄  Update && Restart", font=("Segoe UI", 10, "bold"),
+                  bg=COLORS["accent"], fg="#ffffff", relief=tk.FLAT,
+                  padx=16, pady=6, cursor="hand2",
+                  command=_on_update).pack(side=tk.LEFT, padx=8)
+
+        tk.Button(btn_frame, text="Stay Open", font=("Segoe UI", 10),
+                  bg=COLORS["bg_card"], fg=COLORS["text_dim"], relief=tk.FLAT,
+                  padx=16, pady=6, cursor="hand2",
+                  command=_on_stay).pack(side=tk.LEFT, padx=8)
+
+        def _on_close_popup():
+            _on_stay()
+        popup.protocol("WM_DELETE_WINDOW", _on_close_popup)
 
     def run(self):
         self.root.mainloop()
@@ -3214,7 +3452,7 @@ def main():
         level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S",
         handlers=[RotatingFileHandler(log_file, maxBytes=500*1024, backupCount=2, encoding="utf-8")])
     logging.info("=" * 60)
-    logging.info("VegaAutoclicker v2.0 starting...")
+    logging.info("Antigravity Autoclicker v2.0 starting...")
     app = AntigravityAutoclickerApp()
     app.run()
 

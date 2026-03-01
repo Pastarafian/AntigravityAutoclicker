@@ -1,7 +1,7 @@
 [package]
 name = "antigravity-autoclicker"
 version = "2.0.0"
-description = "VegaAutoclicker — Autonomous Coding Assistant with Auto-Click Engine + AI Agent"
+description = "Antigravity Autoclicker — Autonomous Coding Assistant with Auto-Click Engine + AI Agent"
 authors = ["Pastarafian"]
 license = "MIT"
 edition = "2021"

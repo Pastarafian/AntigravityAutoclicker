@@ -6,12 +6,19 @@
 
 ```bash
 pip install -r requirements.txt
-python antigravity_clicker.py
+python core/antigravity_clicker.py
+```
+
+Or use the desktop app:
+
+```bash
+npm install
+npm run tauri dev
 ```
 
 ## How It Works
 
-1. **Select your profile** — Antigravity (Gemini), GitHub Copilot, Claude Code, Kimi Code, Cursor, or Windsurf
+1. **Select your profile** — Antigravity (Gemini), VS Code, GitHub Copilot, Claude Code, Kimi Code, Cursor, or Windsurf
 2. **Click START** — the scanner finds your IDE window automatically
 3. **Buttons are detected** via HSV color matching + optional OCR text recognition
 4. **Clicks execute** using Windows SendInput API (works with Electron apps like VS Code)
@@ -61,14 +68,18 @@ All settings are saved to `config.json` and editable from the GUI:
 
 ## Supported IDEs
 
-| Profile | Button Colors |
-|---------|--------------|
-| Antigravity (Gemini) | Blue (#0078D4) |
-| GitHub Copilot | Blue + Teal/Green |
-| Claude Code | Orange + Purple-Blue |
-| Kimi Code | Purple + Teal |
-| Cursor | Blue + Teal |
-| Windsurf | Cyan + Purple |
+| Profile | IDE | Button Colors |
+|---------|-----|---------------|
+| Antigravity (Gemini) | VS Code + Gemini Extension | Blue (#0078D4) |
+| GitHub Copilot | VS Code + Copilot Extension | Blue + Teal/Green |
+| Claude Code | VS Code + Claude Extension | Orange + Purple-Blue |
+| Kimi Code | VS Code + Kimi Extension | Purple + Teal |
+| Cursor | Cursor IDE | Blue + Teal |
+| Windsurf | Windsurf (Codeium) | Cyan + Purple |
+
+> **Works with any VS Code-based editor** — All profiles that target VS Code extensions will match windows
+> titled "Visual Studio Code" or "VS Code". The auto-detect feature switches profiles automatically
+> based on which extension/tool is active.
 
 ## AI Agent Modes
 
@@ -84,10 +95,22 @@ All settings are saved to `config.json` and editable from the GUI:
 ## File Structure
 
 ```
-antigravity_clicker.py  ← The one and only program
-config.json             ← Settings (auto-generated)
-requirements.txt        ← Python dependencies
-autoclicker.log         ← Debug log (auto-generated)
+core/
+  antigravity_clicker.py  ← Main Python autoclicker + AI agent
+  config.json             ← Settings (auto-generated, gitignored)
+backend/
+  autoclicker_service.py  ← FastAPI backend for desktop app
+  agent_brain.py          ← AI agent logic
+  llm_client.py           ← LLM API client
+  chat_reader.py          ← Chat window reader
+  workspace_scanner.py    ← Workspace file scanner
+src/
+  App.tsx                 ← React (Tauri) desktop frontend
+  index.css               ← Styles
+src-tauri/                ← Tauri (Rust) desktop shell
+requirements.txt          ← Python dependencies
+package.json              ← Node dependencies
+launch.bat                ← Quick launcher
 ```
 
 ## Requirements
@@ -96,3 +119,7 @@ autoclicker.log         ← Debug log (auto-generated)
 - **Windows 10/11** (uses Win32 API for mouse control and window detection)
 - **Optional**: [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) for text-based button detection
 - **Optional**: [Ollama](https://ollama.com) for the AI Agent autonomous coder feature
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.

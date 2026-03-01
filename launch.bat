@@ -1,11 +1,11 @@
 @echo off
 :: ═══════════════════════════════════════════════════════════════
-:: VegaAutoclicker Launcher
+:: Antigravity Autoclicker Launcher
 :: ═══════════════════════════════════════════════════════════════
 
-title VegaAutoclicker v2.0.0
+title Antigravity Autoclicker v2.0.0
 echo.
-echo  ⚡ VegaAutoclicker v2.0.0
+echo  ⚡ Antigravity Autoclicker v2.0.0
 echo  ==================================
 echo.
 echo  Starting development server...
