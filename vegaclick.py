@@ -22,6 +22,93 @@ import sys
 
 PORT = 9222
 POLL_INTERVAL = 0.8
+SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settings.json')
+
+KEYWORDS = [
+    ('accept all', 'Accept All', '#22c55e', 'Accept all pending code changes'),
+    ('allow', 'Allow', '#22c55e', 'Allow tool access for this conversation'),
+    ('trust', 'Trust', '#22c55e', 'Trust a workspace or extension'),
+    ('approve', 'Approve', '#6366f1', 'Approve a pending action'),
+    ('continue', 'Continue', '#22c55e', 'Continue the current operation'),
+    ('run', 'Run', '#3b82f6', 'Run a terminal command'),
+    ('retry', 'Retry', '#f59e0b', 'Retry a failed operation'),
+    ('ok', 'OK', '#64748b', 'Confirm a dialog prompt'),
+    ('yes', 'Yes', '#64748b', 'Answer yes to a confirmation'),
+    ('apply', 'Apply', '#64748b', 'Apply settings or changes'),
+    ('relocate', 'Relocate', '#64748b', 'Relocate a file or resource'),
+    ('review changes', 'Review', '#a78bfa', 'Review pending code changes'),
+]
+
+PRESETS = {
+    'All': {kw: True for kw, _, _, _ in KEYWORDS},
+    'Safe': {
+        'accept all': True, 'allow': True, 'trust': True,
+        'approve': False, 'continue': True, 'run': False,
+        'retry': True, 'ok': False, 'yes': False,
+        'apply': False, 'relocate': False, 'review changes': True,
+    },
+    'Minimal': {
+        'accept all': True, 'allow': True, 'trust': False,
+        'approve': False, 'continue': False, 'run': False,
+        'retry': False, 'ok': False, 'yes': False,
+        'apply': False, 'relocate': False, 'review changes': False,
+    },
+    'None': {kw: False for kw, _, _, _ in KEYWORDS},
+}
+
+PRESET_DESCS = {
+    'All': 'All buttons enabled',
+    'Safe': 'Accept All, Allow, Trust, Continue, Retry, Review',
+    'Minimal': 'Accept All and Allow only',
+    'None': 'All buttons disabled',
+}
+
+class Tooltip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip = None
+        widget.bind('<Enter>', self.show)
+        widget.bind('<Leave>', self.hide)
+    def show(self, e=None):
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() // 2
+        y = self.widget.winfo_rooty() - 24
+        self.tip = tk.Toplevel(self.widget)
+        self.tip.overrideredirect(True)
+        self.tip.attributes('-topmost', True)
+        lbl = tk.Label(self.tip, text=self.text, font=('Segoe UI', 8),
+                       fg='#e6edf3', bg='#1c2128', padx=6, pady=2, relief='solid', bd=1)
+        lbl.pack()
+        self.tip.update_idletasks()
+        tw = self.tip.winfo_reqwidth()
+        self.tip.geometry(f'+{x - tw // 2}+{y}')
+    def hide(self, e=None):
+        if self.tip:
+            self.tip.destroy()
+            self.tip = None
+
+def load_settings():
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            data = json.load(f)
+            saved = data.get('enabled', {})
+            enabled = {kw: saved.get(kw, True) for kw, _, _, _ in KEYWORDS}
+            scan_delay = data.get('scan_delay', 100)
+            click_delay = data.get('click_delay', 150)
+            preset = data.get('preset', 'All')
+            typing_delay = data.get('typing_delay', 5)
+            scroll_delay = data.get('scroll_delay', 15)
+            return enabled, scan_delay, click_delay, preset, typing_delay, scroll_delay
+    except:
+        return {kw: True for kw, _, _, _ in KEYWORDS}, 100, 150, 'All', 5, 15
+
+def save_settings(enabled, scan_delay=100, click_delay=150, preset='All', typing_delay=5, scroll_delay=15):
+    try:
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump({'enabled': enabled, 'scan_delay': scan_delay, 'click_delay': click_delay,
+                       'preset': preset, 'typing_delay': typing_delay, 'scroll_delay': scroll_delay}, f, indent=2)
+    except:
+        pass
 
 command_queue = queue.Queue()
 
@@ -97,513 +184,46 @@ def cleanup_old_processes():
     my_pid = os.getpid()
     kill_patterns = ['ide-autoclicker', 'vegaclaw', 'vegaclick', 'autoclicker']
     try:
-        result = subprocess.run(
-            ['wmic', 'process', 'where', "name='pythonw.exe' or name='python.exe'",
-             'get', 'ProcessId,CommandLine', '/format:list'],
-            capture_output=True, text=True, timeout=5
-        )
-        current_pid = None; current_cmd = None
-        for line in result.stdout.split('\n'):
-            line = line.strip()
-            if line.startswith('CommandLine='): current_cmd = line[12:].lower()
-            elif line.startswith('ProcessId='):
-                current_pid = int(line[10:])
-                if current_pid != my_pid and current_cmd and any(p in current_cmd for p in kill_patterns):
-                    try: subprocess.run(['taskkill', '/PID', str(current_pid), '/F'], capture_output=True, timeout=3)
-                    except: pass
-                current_pid = None; current_cmd = None
+        if sys.platform == 'win32':
+            result = subprocess.run(
+                ['wmic', 'process', 'where', "name='pythonw.exe' or name='python.exe'",
+                 'get', 'ProcessId,CommandLine', '/format:list'],
+                capture_output=True, text=True, timeout=5
+            )
+            current_pid = None; current_cmd = None
+            for line in result.stdout.split('\n'):
+                line = line.strip()
+                if line.startswith('CommandLine='): current_cmd = line[12:].lower()
+                elif line.startswith('ProcessId='):
+                    current_pid = int(line[10:])
+                    if current_pid != my_pid and current_cmd and any(p in current_cmd for p in kill_patterns):
+                        try: subprocess.run(['taskkill', '/PID', str(current_pid), '/F'], capture_output=True, timeout=3)
+                        except: pass
+                    current_pid = None; current_cmd = None
+        else:
+            # Linux/macOS: use ps + grep
+            result = subprocess.run(
+                ['ps', 'aux'], capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.split('\n'):
+                lower = line.lower()
+                if any(p in lower for p in kill_patterns) and ('python' in lower):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            pid = int(parts[1])
+                            if pid != my_pid:
+                                os.kill(pid, 9)
+                        except: pass
     except: pass
 
 # ═══════════════════════════════════════════════════════════════
 # VegaClick v16 — DEEP SCANNER + FAST CLICKER JS
 # ═══════════════════════════════════════════════════════════════
-FINDER_JS = r"""
-(function(){
-  // ─── HEARTBEAT ───
-  if(window.__vc && (Date.now() - window.__vchb < 10000)) {
-    var typLeft = window.__vctyping ? Math.max(0, 5000 - (Date.now() - window.__vctyping)) : 0;
-    var scrLeft = window.__vcscrolling ? Math.max(0, 15000 - (Date.now() - window.__vcscrolling)) : 0;
-    var cd = Math.max(typLeft, scrLeft);
-    return JSON.stringify({s:'active', c:window.__vcc||0, m:window.__vcm||'', inv:window.__vcTargets?window.__vcTargets.length:0, ml:window.__vcMLStats||{}, cd:cd});
-  }
-
-  // ─── CLEANUP ───
-  if(window.__vcObs) { try{window.__vcObs.disconnect();}catch(e){} }
-  if(window.__vcInt) clearInterval(window.__vcInt);
-  if(window.__vcScanInt) clearInterval(window.__vcScanInt);
-  if(window.__vcKD) document.removeEventListener('keydown', window.__vcKD, true);
-  if(window.__vcWH) document.removeEventListener('wheel', window.__vcWH, true);
-  if(window.__vcTM) document.removeEventListener('touchmove', window.__vcTM, true);
-
-  // ─── STATE ───
-  window.__vc = true;
-  window.__vchb = Date.now();
-  window.__vcc = window.__vcc || 0;
-  window.__vcm = window.__vcm || '';
-  window.__vctyping = 0;
-  window.__vcoverlay = true;
-  window.__vcTargets = [];  // Scanner results — the clicker reads from here
-  window.__vcClicked = {};  // Dedup map: hash -> timestamp
-
-  // ═══════════════════════════════════════════════════════════
-  // MACHINE LEARNING STATE
-  // Learns from successful/failed clicks, persists in localStorage
-  // ═══════════════════════════════════════════════════════════
-  try {
-    window.__vcML = JSON.parse(localStorage.getItem('__vcML') || '{}');
-  } catch(e) { window.__vcML = {}; }
-  // ML structure: { signature: { hits: N, misses: N, score: N, lastSeen: timestamp } }
-  window.__vcMLStats = { learned: Object.keys(window.__vcML).length, rewarded: 0, punished: 0, blocked: 0 };
-
-  // ─── ML: Extract element signature for learning ───
-  function getSignature(el, kw) {
-    var tag = el.tagName ? el.tagName.toLowerCase() : '?';
-    var cls = (el.className||'').toString().split(/\s+/).slice(0,3).sort().join(',');
-    var pTag = el.parentElement ? el.parentElement.tagName.toLowerCase() : '?';
-    var pCls = el.parentElement ? (el.parentElement.className||'').toString().split(/\s+/).slice(0,2).sort().join(',') : '';
-    return kw + '|' + tag + '|' + cls.slice(0,40) + '|' + pTag + '|' + pCls.slice(0,30);
-  }
-
-  // ─── ML: Record success (button disappeared after click) ───
-  function mlReward(sig) {
-    if(!window.__vcML[sig]) window.__vcML[sig] = {hits:0, misses:0, score:0, lastSeen:0};
-    window.__vcML[sig].hits++;
-    window.__vcML[sig].score = Math.min(window.__vcML[sig].score + 2, 20); // Cap at +20
-    window.__vcML[sig].lastSeen = Date.now();
-    window.__vcMLStats.rewarded++;
-    try { localStorage.setItem('__vcML', JSON.stringify(window.__vcML)); } catch(e){}
-  }
-
-  // ─── ML: Record failure (button still visible after click) ───
-  function mlPunish(sig) {
-    if(!window.__vcML[sig]) window.__vcML[sig] = {hits:0, misses:0, score:0, lastSeen:0};
-    window.__vcML[sig].misses++;
-    window.__vcML[sig].score = Math.max(window.__vcML[sig].score - 1, -10); // Floor at -10
-    window.__vcML[sig].lastSeen = Date.now();
-    window.__vcMLStats.punished++;
-    try { localStorage.setItem('__vcML', JSON.stringify(window.__vcML)); } catch(e){}
-  }
-
-  // ─── ML: Get priority adjustment for a signature ───
-  function mlBoost(sig) {
-    var data = window.__vcML[sig];
-    if(!data) return 0;
-    if(data.score <= -5) { window.__vcMLStats.blocked++; return -999; } // Auto-block bad patterns
-    return data.score; // Positive = boost, negative = demote
-  }
-
-  // ─── TYPING DETECTION (5s cooldown) ───
-  window.__vcKD = function(e){
-    if(e.key && (e.key.length===1||e.key==='Backspace'||e.key==='Enter'||e.key==='Tab'))
-      window.__vctyping = Date.now();
-  };
-  document.addEventListener('keydown', window.__vcKD, true);
-
-  // ─── SCROLL DETECTION (15s cooldown for auto-scroll only) ───
-  window.__vcscrolling = 0;
-  window.__vcWH = function(){ window.__vcscrolling = Date.now(); };
-  window.__vcTM = function(){ window.__vcscrolling = Date.now(); };
-  document.addEventListener('wheel', window.__vcWH, true);
-  document.addEventListener('touchmove', window.__vcTM, true);
-
-  // ─── AUTO-SCROLL: Keep chat pinned to bottom ───
-  function autoScroll() {
-    // Don't auto-scroll if user scrolled in last 15s
-    if(Date.now() - window.__vcscrolling < 15000) return;
-    var containers = document.querySelectorAll('[class*="overflow"]');
-    for(var i=0; i<containers.length; i++){
-      var el = containers[i];
-      var cs = window.getComputedStyle(el);
-      if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight > el.clientHeight + 50){
-        var distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        if(distFromBottom > 200){
-          el.scrollTop = el.scrollHeight;
-        }
-      }
-    }
-  }
-
-  // ─── BLOCKLIST ───
-  var BL = [
-    'delete','remove','uninstall','format','reset','sign out','log out',
-    'close','cancel','discard','reject','deny','dismiss','erase','drop',
-    'run and debug','go back','go forward','more actions','always run',
-    'running','runner','run extension','run_cli','rescue run','rescue',
-    'allowlist','restart','reload','rules','mcp','feedback','star'
-  ];
-
-  // ─── DANGER COMMANDS ───
-  var BCMD = ['rm ','rm -','del ','format ','fdisk','mkfs','dd if=','DROP TABLE','DROP DATABASE'];
-
-  // ═══════════════════════════════════════════════════════════
-  // PART 1: DEEP SCANNER
-  // Walks ENTIRE DOM tree including shadow DOMs and iframes
-  // Finds ALL elements, checks text against keywords
-  // Stores matches in window.__vcTargets
-  // ═══════════════════════════════════════════════════════════
-  function deepScan() {
-    var targets = [];
-    var seen = new Set();
-
-    function walk(root, depth) {
-      if(depth > 12) return;
-      try {
-        // Get ALL elements in this root
-        var all = root.querySelectorAll('*');
-        for(var i = 0; i < all.length; i++) {
-          var e = all[i];
-          if(seen.has(e)) continue;
-          seen.add(e);
-
-          // Get text from multiple sources
-          var raw = '';
-          // For leaf-ish elements, use textContent; for containers, use first line of innerText
-          var inner = (e.innerText || '').trim();
-          var textC = (e.textContent || '').trim();
-          var aria = (e.getAttribute('aria-label') || '').trim();
-          var title = (e.getAttribute('title') || '').trim();
-          var val = (e.getAttribute('value') || '').trim();
-
-          // Prefer short text sources (more specific)
-          if(inner && inner.length < 60) raw = inner;
-          else if(textC && textC.length < 60) raw = textC;
-          else if(aria) raw = aria;
-          else if(title) raw = title;
-          else if(val) raw = val;
-
-          if(!raw) {
-            // Enter shadow roots even if no text
-            if(e.shadowRoot) walk(e.shadowRoot, depth+1);
-            continue;
-          }
-
-          var t = raw.split(/\r?\n/)[0].trim().toLowerCase();
-          if(t.length > 60 || t.length < 2) {
-            if(e.shadowRoot) walk(e.shadowRoot, depth+1);
-            continue;
-          }
-
-          // Blocklist check
-          var blocked = false;
-          for(var bi=0; bi<BL.length; bi++){
-            if(t.indexOf(BL[bi])>=0){ blocked=true; break; }
-          }
-
-          // Skip menubar and non-chat UI elements
-          var cls = (e.className||'').toString().toLowerCase();
-          var tag = e.tagName ? e.tagName.toLowerCase() : '';
-
-          // Skip list: editor, code, tabs, terminal, status bar, diff viewer, sidebar
-          if(cls.indexOf('menubar-menu')>=0 || cls.indexOf('menu-item')>=0 ||
-             cls.indexOf('mtk')>=0 ||           // Monaco token (code highlighting)
-             cls.indexOf('monaco-icon-label')>=0 || // File path labels
-             cls.indexOf('tab ')>=0 || cls.indexOf('tab-')>=0 || // File tabs
-             cls.indexOf('diffeditor')>=0 || cls.indexOf('diff-')>=0 || // Diff view
-             cls.indexOf('editor-container')>=0 ||  // Editor area
-             cls.indexOf('xterm')>=0 ||          // Terminal
-             cls.indexOf('statusbar')>=0 ||      // Status bar
-             cls.indexOf('minimap')>=0 ||         // Minimap
-             cls.indexOf('breadcrumb')>=0 ||      // Breadcrumbs
-             cls.indexOf('explorer')>=0 ||        // File explorer
-             cls.indexOf('label-name')>=0 ||      // Tab labels
-             cls.indexOf('filename-link')>=0 ||   // Filename links in chat (not buttons)
-             cls.indexOf('action-card')>=0 ||     // Sidebar action cards
-             cls.indexOf('action-row')>=0 ||      // Sidebar action rows
-             cls.indexOf('sidebar')>=0 ||         // Sidebar elements
-             cls.indexOf('settings')>=0 ||        // Settings panels
-             cls.indexOf('global-tooltip')>=0 ||  // Tooltips
-             (tag === 'span' && cls.indexOf('mtk')>=0) || // Code spans
-             (tag === 'div' && cls.indexOf('view-line')>=0)) { // Editor lines
-            if(e.shadowRoot) walk(e.shadowRoot, depth+1);
-            continue;
-          }
-
-          // Also skip if element is inside the editor (role=tab = file tab, not action button)
-          if(tag !== 'button' && e.getAttribute('role') === 'tab') {
-            if(e.shadowRoot) walk(e.shadowRoot, depth+1);
-            continue;
-          }
-
-          // PARENT CHECK: skip if inside sidebar, action-card, settings panel
-          var inSidebar = false;
-          var pp = e.parentElement;
-          for(var pi=0; pi<6 && pp; pi++){
-            var pc = (pp.className||'').toString().toLowerCase();
-            var pt = pp.tagName ? pp.tagName.toLowerCase() : '';
-            if(pc.indexOf('sidebar')>=0 || pc.indexOf('action-card')>=0 ||
-               pc.indexOf('action-row')>=0 || pc.indexOf('settings')>=0 ||
-               pc.indexOf('panel-container')>=0 || pc.indexOf('pane-body')>=0 ||
-               pt === 'sidebar-footer' || pt === 'sidebar-header'){
-              inSidebar = true; break;
-            }
-            pp = pp.parentElement;
-          }
-          if(inSidebar) continue;
-
-          if(blocked) {
-            if(e.shadowRoot) walk(e.shadowRoot, depth+1);
-            continue;
-          }
-
-          // ─── KEYWORD MATCHING ───
-          var kw = null, priority = 0;
-
-          if(t === 'accept all' || t.indexOf('accept all') === 0)
-            { kw='accept all'; priority=100; }
-          else if(t === 'accept' || t.indexOf('accept ') === 0)
-            { kw='accept'; priority=90; }
-          else if(t === 'allow in this conversation' || t === 'allow this conversation')
-            { kw='allow'; priority=85; }
-          else if(t === 'trust' || t.indexOf('trust ') === 0)
-            { kw='trust'; priority=85; }
-          else if(t === 'approve' || t.indexOf('approve ') === 0)
-            { kw='approve'; priority=80; }
-          else if(t === 'continue')
-            { kw='continue'; priority=75; }
-          else if(t.indexOf('run') === 0)
-            { kw='run'; priority=70; }
-          else if(t === 'retry')
-            { kw='retry'; priority=65; }
-          else if(t === 'ok')
-            { kw='ok'; priority=60; }
-          else if(t === 'yes')
-            { kw='yes'; priority=55; }
-          else if(t === 'apply')
-            { kw='apply'; priority=50; }
-          else if(t === 'relocate')
-            { kw='relocate'; priority=45; }
-          else if(t.indexOf('changes overview') === 0)
-            { kw='changes overview'; priority=40; }
-
-          if(kw) {
-            targets.push({el:e, kw:kw, priority:priority, text:t, depth:depth});
-          }
-
-          // Always recurse into shadow roots
-          if(e.shadowRoot) walk(e.shadowRoot, depth+1);
-        }
-
-        // Recurse into iframes
-        var iframes = root.querySelectorAll('iframe, webview');
-        for(var j=0; j<iframes.length; j++){
-          try {
-            var doc = iframes[j].contentDocument || (iframes[j].contentWindow && iframes[j].contentWindow.document);
-            if(doc) walk(doc, depth+1);
-          } catch(e){}
-        }
-      } catch(e){}
-    }
-
-    walk(document, 0);
-    window.__vcTargets = targets;
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // PART 2: FAST CLICKER
-  // Reads from window.__vcTargets (populated by scanner)
-  // Quickly filters for visibility, dedup, danger
-  // Clicks all valid targets in priority order
-  // ═══════════════════════════════════════════════════════════
-  function clickTargets() {
-    window.__vchb = Date.now();
-
-    // Typing cooldown (5s)
-    if(Date.now() - window.__vctyping < 5000) return;
-
-    // Auto-scroll chat (respects 15s scroll cooldown)
-    autoScroll();
-
-    var targets = window.__vcTargets || [];
-    if(targets.length === 0) return;
-
-    var candidates = [];
-
-    for(var i=0; i<targets.length; i++){
-      var t = targets[i];
-      var e = t.el;
-      if(!e || !e.isConnected) continue; // Element removed from DOM
-      if(e.dataset && e.dataset.vc16) continue; // Already clicked
-
-      // Visibility check
-      var r;
-      try { r = e.getBoundingClientRect(); } catch(ex){ continue; }
-      if(r.width === 0 || r.height === 0) continue;
-      if(r.top < -10 || r.bottom > window.innerHeight + 50) continue;
-      try {
-        var cs = window.getComputedStyle(e);
-        if(cs.display === 'none' || cs.visibility === 'hidden') continue;
-      } catch(ex){}
-
-      // Danger check for 'run'
-      if(t.kw === 'run') {
-        var danger = false, p = e;
-        for(var j=0; j<4 && p; j++){
-          try {
-            var cd = p.querySelector('code,pre');
-            if(cd){
-              var cdt = (cd.textContent||'');
-              for(var di=0; di<BCMD.length; di++){
-                if(cdt.indexOf(BCMD[di])>=0){ danger=true; break; }
-              }
-            }
-          } catch(ex){}
-          if(danger) break;
-          p = p.parentElement;
-        }
-        if(danger) continue;
-      }
-
-      // Dedup check
-      var hash = t.kw + '|' + Math.round(r.left/20) + '|' + Math.round(r.top/20);
-      var lastClick = window.__vcClicked[hash];
-      if(lastClick && Date.now() - lastClick < 5000) continue;
-
-      // ML: Adjust priority based on learned patterns
-      var sig = getSignature(e, t.kw);
-      var boost = mlBoost(sig);
-      if(boost <= -999) continue; // ML blocked this pattern
-      var adjPriority = t.priority + boost;
-
-      candidates.push({el:e, kw:t.kw, priority:adjPriority, rect:r, hash:hash, text:t.text, sig:sig});
-    }
-
-    // Sort by priority
-    candidates.sort(function(a,b){ return b.priority - a.priority; });
-
-    // Inject ripple CSS
-    if(candidates.length > 0 && window.__vcoverlay && !window.__vccss){
-      window.__vccss = true;
-      var st = document.createElement('style');
-      st.textContent = '@keyframes vcripple{0%{transform:scale(0.5);opacity:1}100%{transform:scale(2.5);opacity:0}}';
-      document.head.appendChild(st);
-    }
-
-    var colors = {
-      'run':'59,130,246','accept all':'34,197,94','accept':'34,197,94',
-      'allow':'34,197,94','trust':'34,197,94','continue':'34,197,94',
-      'retry':'234,179,8','approve':'99,102,241','changes overview':'168,85,247'
-    };
-
-    // Click all
-    for(var ci=0; ci<candidates.length; ci++){
-      var c = candidates[ci];
-      var el = c.el;
-      var rect = c.rect;
-
-      el.dataset.vc16 = '1';
-      window.__vcClicked[c.hash] = Date.now();
-
-      // Click dispatch
-      try {
-        var cx = rect.left + rect.width/2;
-        var cy = rect.top + rect.height/2;
-        el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,clientX:cx,clientY:cy}));
-        el.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,cancelable:true,clientX:cx,clientY:cy}));
-        el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:cx,clientY:cy}));
-        if(typeof el.click==='function') setTimeout(function(){try{el.click();}catch(e){}}, 50);
-      } catch(ex){
-        try{el.click();}catch(e2){}
-      }
-
-      if(typeof el.blur==='function') el.blur();
-
-      // Visual ripple
-      if(window.__vcoverlay){
-        var rgb = colors[c.kw]||'139,92,246';
-        var dx = Math.round(rect.left+rect.width/2);
-        var dy = Math.round(rect.top+rect.height/2);
-        var dot = document.createElement('div');
-        dot.style.cssText = 'position:fixed;pointer-events:none;z-index:999999;border-radius:50%;'+
-          'left:'+(dx-16)+'px;top:'+(dy-16)+'px;width:32px;height:32px;'+
-          'border:3px solid rgba('+rgb+',0.9);background:rgba('+rgb+',0.3);'+
-          'animation:vcripple 0.5s ease-out forwards;';
-        document.body.appendChild(dot);
-        setTimeout(function(){try{dot.remove();}catch(e){}}, 600);
-      }
-
-      window.__vcc++;
-      window.__vcm = 'Clicked ' + c.kw + ' (' + c.text.slice(0,15) + ')';
-
-      // ─── ML: Success/failure detection ───
-      // After 600ms, check if the element disappeared (success) or stayed (failure)
-      (function(el, sig, kw){
-        var wasRect = {l: el.getBoundingClientRect().left, t: el.getBoundingClientRect().top};
-        setTimeout(function(){
-          try {
-            // Check if element is still in DOM and visible
-            if(!el.isConnected) {
-              // Element removed from DOM = definite success
-              mlReward(sig);
-              return;
-            }
-            var newRect = el.getBoundingClientRect();
-            if(newRect.width === 0 || newRect.height === 0) {
-              // Element hidden = success
-              mlReward(sig);
-              return;
-            }
-            var cs = window.getComputedStyle(el);
-            if(cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') {
-              // Element hidden via CSS = success
-              mlReward(sig);
-              return;
-            }
-            // Element moved significantly = probably success (UI reshuffled)
-            if(Math.abs(newRect.left - wasRect.l) > 50 || Math.abs(newRect.top - wasRect.t) > 50) {
-              mlReward(sig);
-              return;
-            }
-            // Element still there and unchanged = failure/misclick
-            mlPunish(sig);
-          } catch(ex) {
-            // If we can't check, assume success (element might have been removed)
-            mlReward(sig);
-          }
-            // Clear click flag
-          try { delete el.dataset.vc16; } catch(e){}
-        }, 600);
-      })(el, c.sig, c.kw);
-
-      // Clear flag after 5s as fallback
-      (function(el){setTimeout(function(){try{delete el.dataset.vc16;}catch(e){}}, 5000);})(el);
-    }
-
-    // Cleanup old dedup entries
-    var now = Date.now();
-    for(var key in window.__vcClicked){
-      if(now - window.__vcClicked[key] > 10000) delete window.__vcClicked[key];
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // PART 3: ORCHESTRATOR
-  // Deep scan runs every 2s (thorough but heavier)
-  // Click check runs every 100ms on mutation + every 500ms
-  // ═══════════════════════════════════════════════════════════
-
-  // Initial deep scan
-  deepScan();
-
-  // Deep scan on interval (re-walks entire DOM)
-  window.__vcScanInt = setInterval(deepScan, 2000);
-
-  // Fast clicker on mutation observer
-  var thr = null;
-  window.__vcObs = new MutationObserver(function(){
-    // Re-scan on DOM changes (quick scan + click)
-    deepScan();
-    if(thr) return;
-    thr = setTimeout(function(){ thr=null; clickTargets(); }, 80);
-  });
-  window.__vcObs.observe(document.body, {childList:true, subtree:true});
-
-  // Fast clicker on interval
-  window.__vcInt = setInterval(clickTargets, 500);
-  setTimeout(clickTargets, 200);
-
-  return JSON.stringify({s:'injected', c:0, m:'v16 deep scanner injected', cd:0});
-})()
-"""
+import os
+_scanner_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scanner.js')
+with open(_scanner_path, 'r', encoding='utf-8') as _f:
+    FINDER_JS = _f.read()
 
 # ═══════════════════════════════════════════════════════════════
 # CDP Helpers
@@ -644,8 +264,7 @@ class VegaClickApp:
         self.root.attributes('-alpha', 0.95)
         self.root.configure(bg='#0e1117')
 
-        self.paused = False
-        self.stopped = False
+        self.active = False
         self.total_clicks = 0
         self.cooldown = 0
         self.status_text = "Searching..."
@@ -653,37 +272,43 @@ class VegaClickApp:
         self.last_msg = ""
         self.pages_connected = 0
         self.scan_targets = 0
+        self.search_ticks = 0
+        self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay = load_settings()
+        self.drawer = None
+        self.toggle_labels = {}
+        self.log_entries = []
+        self.log_window = None
+        self.preset_popup = None
 
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        self.root.geometry(f"480x30+{sw - 500}+{sh - 70}")
+        self.root.geometry(f"400x30+{sw - 430}+{sh - 70}")
 
-        frame = tk.Frame(self.root, bg='#0e1117')
-        frame.place(x=8, rely=0.5, anchor='w')
+        tk.Label(self.root, text="VegaClick", font=("Segoe UI", 9, "bold"), fg='#00d4ff', bg='#0e1117').pack(side='left', padx=(8,4), pady=4)
+        self.settings_btn = tk.Label(self.root, text="⚙", font=("Segoe UI", 9), fg='white', bg='#1c2128', cursor='hand2', width=2)
+        self.settings_btn.pack(side='left', padx=(0,8), ipady=1, ipadx=2, pady=4)
+        self.settings_btn.bind('<Button-1>', lambda e: self.toggle_settings())
 
-        tk.Label(frame, text="VegaClick", font=("Segoe UI", 9, "bold"), fg='#00d4ff', bg='#0e1117').pack(side='left', padx=(0,4))
-        tk.Label(frame, text="16", font=("Consolas", 8, "bold"), fg='#a78bfa', bg='#1c2128').pack(side='left', padx=(0,8), ipady=1, ipadx=2)
+        self.ui_status = tk.Label(self.root, text="...", font=("Consolas", 9), fg=self.status_color, bg='#0e1117', width=16, anchor='w')
+        self.ui_status.pack(side='left', padx=(0,4), pady=4)
 
-        self.ui_status = tk.Label(frame, text="...", font=("Consolas", 9), fg=self.status_color, bg='#0e1117', width=16, anchor='w')
-        self.ui_status.pack(side='left', padx=(0,8))
+        self.ui_count = tk.Label(self.root, text="0 clicks", font=("Consolas", 9), fg='#64748b', bg='#0e1117', width=11, anchor='w')
+        self.ui_count.pack(side='left', padx=(0,4), pady=4)
 
-        self.ui_count = tk.Label(frame, text="0 clicks", font=("Consolas", 9), fg='#64748b', bg='#0e1117', width=11, anchor='w')
-        self.ui_count.pack(side='left', padx=(0,12))
-
-        self.btns = {}
-        for name, txt, clr in [('play','▶','#22c55e'), ('pause','⏸','#f59e0b'), ('stop','■','#ef4444')]:
-            b = tk.Label(frame, text=txt, font=("Segoe UI", 8), bg='#1c2128', fg=clr, width=3)
-            b.pack(side='left', padx=2, pady=4)
-            b.bind('<Button-1>', lambda e, n=name: self.set_state(n))
-            self.btns[name] = b
+        close_btn = tk.Label(self.root, text="✕", font=("Segoe UI", 10), bg='#1c2128', fg='#64748b',
+                             width=2, anchor='center', bd=0, relief='flat', padx=4, pady=2)
+        close_btn.pack(side='right', padx=(2, 8), pady=4)
+        close_btn.bind('<Button-1>', lambda e: self.on_close())
 
         self.overlay_on = True
-        self.overlay_btn = tk.Label(frame, text="◎", font=("Segoe UI", 8), bg='#2d333b', fg='#a78bfa', width=3)
-        self.overlay_btn.pack(side='left', padx=2, pady=4)
+        self.overlay_btn = tk.Label(self.root, text="◎", font=("Segoe UI", 10), bg='#2d333b', fg='#a78bfa',
+                                    width=2, anchor='center', bd=0, relief='flat', padx=4, pady=2)
+        self.overlay_btn.pack(side='right', padx=2, pady=4)
         self.overlay_btn.bind('<Button-1>', lambda e: self.toggle_overlay())
 
-        close_btn = tk.Label(frame, text="✕", font=("Segoe UI", 8), bg='#1c2128', fg='#64748b', width=3)
-        close_btn.pack(side='left', padx=2, pady=4)
-        close_btn.bind('<Button-1>', lambda e: self.root.destroy())
+        self.play_btn = tk.Label(self.root, text='⏸', font=("Segoe UI", 10), bg='#1c2128', fg='#f59e0b',
+                                 width=2, anchor='center', bd=0, relief='flat', padx=4, pady=2)
+        self.play_btn.pack(side='right', padx=2, pady=4)
+        self.play_btn.bind('<Button-1>', lambda e: self.toggle_play())
 
         self.root.bind('<Button-1>', self._start_drag)
         self.root.bind('<B1-Motion>', self._on_drag)
@@ -692,26 +317,405 @@ class VegaClickApp:
         self.thread.start()
         self.refresh_ui()
 
-    def _start_drag(self, e): self._dx, self._dy = e.x, e.y
-    def _on_drag(self, e): self.root.geometry(f"+{self.root.winfo_x()+(e.x-self._dx)}+{self.root.winfo_y()+(e.y-self._dy)}")
+    def _start_drag(self, e):
+        if e.widget in (self.settings_btn, self.play_btn, self.overlay_btn):
+            return
+        self._dx, self._dy = e.x, e.y
+        self.close_drawer()
+    def _on_drag(self, e):
+        if e.widget in (self.settings_btn, self.play_btn, self.overlay_btn):
+            return
+        self.root.geometry(f"+{self.root.winfo_x()+(e.x-self._dx)}+{self.root.winfo_y()+(e.y-self._dy)}")
+
+    def on_close(self):
+        self.close_drawer()
+        self.root.withdraw()
+        self.active = False
+        def _force_exit():
+            import os
+            self.root.destroy()
+            os._exit(0)
+        self.root.after(1200, _force_exit)
+
+    def prompt_restart(self):
+        import tkinter.messagebox as mb
+        self.active = False
+        self.play_btn.configure(bg='#1c2128')
+        ans = mb.askyesno(
+            "Connection Timeout", 
+            "Antigravity hasn't loaded up in the correct mode to enable CDP access.\n\nWould you like to restart Antigravity with CDP (debug) settings enabled automatically?"
+        )
+        if ans:
+            self.restart_antigravity()
+        else:
+            self.search_ticks = 0
+
+    def restart_antigravity(self):
+        import subprocess
+        import os
+        import time
+        import tkinter.messagebox as mb
+        
+        # Disable search ticks momentarily to avoid duplicate alerts while restarting
+        self.search_ticks = 0
+        self.status_text = "Restarting..."
+        self.status_color = "#3b82f6"
+        self.refresh_ui()
+
+        try:
+            if sys.platform == 'win32':
+                # Windows: use PowerShell/CIM to find the exe path
+                cmd = 'Get-CimInstance Win32_Process -Filter "Name=\'Antigravity.exe\'" | Select-Object -ExpandProperty ExecutablePath | Select-Object -First 1'
+                res = subprocess.run(["powershell", "-Command", cmd], capture_output=True, text=True, timeout=10)
+                exe_path = res.stdout.strip()
+                
+                if not exe_path or not os.path.exists(exe_path):
+                    local_appdata = os.getenv('LOCALAPPDATA', '')
+                    fallback = os.path.join(local_appdata, 'Programs', 'Antigravity', 'Antigravity.exe')
+                    if os.path.exists(fallback):
+                        exe_path = fallback
+                    else:
+                        mb.showerror("Error", "Could not locate Antigravity.exe path automatically.\nPlease restart it manually.")
+                        return
+
+                subprocess.run(["taskkill", "/F", "/IM", "Antigravity.exe"], capture_output=True)
+                time.sleep(1.5)
+                subprocess.Popen([exe_path, "--remote-debugging-port=9222"], shell=True)
+            else:
+                # Linux/macOS: use pgrep/which/readlink to find and restart
+                exe_path = None
+
+                # Try to find the running process exe
+                try:
+                    pid_res = subprocess.run(['pgrep', '-f', '[Aa]ntigravity'], capture_output=True, text=True, timeout=5)
+                    pids = pid_res.stdout.strip().split('\n')
+                    for pid in pids:
+                        pid = pid.strip()
+                        if pid:
+                            exe_link = f'/proc/{pid}/exe'
+                            if os.path.exists(exe_link):
+                                exe_path = os.readlink(exe_link)
+                                break
+                except: pass
+
+                # Fallback: check common install locations
+                if not exe_path:
+                    for candidate in [
+                        os.path.expanduser('~/.local/share/Antigravity/antigravity'),
+                        '/opt/Antigravity/antigravity',
+                        '/usr/bin/antigravity',
+                        '/usr/local/bin/antigravity',
+                    ]:
+                        if os.path.exists(candidate):
+                            exe_path = candidate
+                            break
+
+                # Fallback: use `which`
+                if not exe_path:
+                    try:
+                        which_res = subprocess.run(['which', 'antigravity'], capture_output=True, text=True, timeout=5)
+                        found = which_res.stdout.strip()
+                        if found and os.path.exists(found):
+                            exe_path = found
+                    except: pass
+
+                if not exe_path:
+                    mb.showerror("Error", "Could not locate Antigravity binary automatically.\nPlease restart it manually.")
+                    return
+
+                # Kill existing Antigravity processes
+                try:
+                    subprocess.run(['killall', '-9', 'antigravity'], capture_output=True, timeout=5)
+                    subprocess.run(['killall', '-9', 'Antigravity'], capture_output=True, timeout=5)
+                except: pass
+                time.sleep(1.5)
+                subprocess.Popen([exe_path, "--remote-debugging-port=9222"])
+
+            self.active = True
+            self.play_btn.configure(bg='#2d333b', text='\u25b6', fg='#22c55e', font=('Segoe UI', 10))
+
+        except Exception as e:
+            mb.showerror("Restart Error", f"Failed to restart Antigravity: {e}")
 
     def toggle_overlay(self):
         self.overlay_on = not self.overlay_on
         self.overlay_btn.configure(bg='#2d333b' if self.overlay_on else '#1c2128', fg='#a78bfa' if self.overlay_on else '#64748b')
 
-    def set_state(self, action):
-        if action == 'play': self.paused = False; self.stopped = False
-        elif action == 'pause': self.paused = True; self.stopped = False
-        elif action == 'stop': self.paused = False; self.stopped = True
-        for name, btn in self.btns.items():
-            btn.configure(bg='#2d333b' if name == action else '#1c2128')
+    def toggle_play(self):
+        self.active = not getattr(self, 'active', True)
+        if self.active:
+            self.play_btn.configure(bg='#2d333b', text='▶', fg='#22c55e', font=('Segoe UI', 10))
+        else:
+            self.play_btn.configure(bg='#1c2128', text='⏸', fg='#f59e0b', font=('Segoe UI', 10))
+
+    def toggle_settings(self):
+        if self.drawer and self.drawer.winfo_exists():
+            self.close_drawer()
+        else:
+            self.open_drawer()
+
+    def close_drawer(self):
+        self.close_preset_popup()
+        if self.drawer:
+            try:
+                if self.drawer.winfo_exists():
+                    self.drawer.destroy()
+            except:
+                pass
+        self.drawer = None
+
+    def open_drawer(self):
+        self.close_drawer()
+        d = tk.Toplevel(self.root)
+        d.overrideredirect(True)
+        d.attributes('-topmost', True)
+        d.attributes('-alpha', 0.95)
+        d.configure(bg='#0e1117')
+
+        # Header
+        header = tk.Frame(d, bg='#0e1117')
+        header.pack(fill='x', padx=8, pady=(8, 4))
+        tk.Label(header, text="Click Toggles", font=("Segoe UI", 9, "bold"),
+                 fg='#64748b', bg='#0e1117').pack(side='left')
+
+        self.preset_btn = tk.Label(header, text=f"\u25be {self.preset}", font=("Segoe UI", 8, "bold"),
+                                   fg='#a78bfa', bg='#1c2128', cursor='hand2', padx=4, pady=1)
+        self.preset_btn.pack(side='right')
+        self.preset_btn.bind('<Button-1>', lambda e: self.open_preset_dropdown())
+        Tooltip(self.preset_btn, 'Select a preset configuration')
+
+        # Toggle grid
+        grid = tk.Frame(d, bg='#0e1117')
+        grid.pack(fill='x', padx=6, pady=(0, 8))
+
+        self.toggle_labels = {}
+        for idx, (kw, display, color, desc) in enumerate(KEYWORDS):
+            row = idx // 3
+            col = idx % 3
+            on = self.enabled.get(kw, True)
+            lbl = tk.Label(grid, text=display, font=("Segoe UI", 8, "bold"),
+                           fg='#00d4ff' if on else '#64748b',
+                           bg='#2d333b' if on else '#1c2128',
+                           width=12, cursor='hand2',
+                           relief='flat', padx=4, pady=3)
+            lbl.grid(row=row, column=col, padx=3, pady=2, sticky='ew')
+            lbl.bind('<Button-1>', lambda e, k=kw: self.click_toggle(k))
+            Tooltip(lbl, desc)
+            self.toggle_labels[kw] = (lbl, color)
+
+        for c in range(3):
+            grid.columnconfigure(c, weight=1)
+
+        # Row 4: Logs + Typing + Scroll
+        logs_btn = tk.Label(grid, text="Logs", font=("Segoe UI", 8, "bold"),
+                            fg='#a78bfa', bg='#2d333b', cursor='hand2',
+                            width=12, relief='flat', padx=4, pady=3)
+        logs_btn.grid(row=4, column=0, padx=3, pady=2, sticky='ew')
+        logs_btn.bind('<Button-1>', lambda e: self.open_log_window())
+        Tooltip(logs_btn, 'Open click history log window')
+
+        typing_cell = tk.Frame(grid, bg='#1c2128')
+        typing_cell.grid(row=4, column=1, padx=3, pady=2, sticky='ew')
+        tk.Label(typing_cell, text="Typing:", font=("Segoe UI", 8, "bold"),
+                 fg='#00d4ff', bg='#1c2128').pack(side='left', padx=(4,2))
+        self.typing_entry = tk.Entry(typing_cell, width=3, font=("Segoe UI", 8, "bold"),
+                                    bg='#1c2128', fg='#e6edf3', insertbackground='#e6edf3',
+                                    relief='flat', bd=0, highlightthickness=0)
+        self.typing_entry.insert(0, str(self.typing_delay))
+        self.typing_entry.pack(side='left')
+        tk.Label(typing_cell, text="s", font=("Consolas", 8),
+                 fg='#64748b', bg='#1c2128').pack(side='left', padx=(0,4))
+
+        scroll_cell = tk.Frame(grid, bg='#1c2128')
+        scroll_cell.grid(row=4, column=2, padx=3, pady=2, sticky='ew')
+        tk.Label(scroll_cell, text="Scroll:", font=("Segoe UI", 8, "bold"),
+                 fg='#00d4ff', bg='#1c2128').pack(side='left', padx=(4,2))
+        self.scroll_entry = tk.Entry(scroll_cell, width=3, font=("Segoe UI", 8, "bold"),
+                                    bg='#1c2128', fg='#e6edf3', insertbackground='#e6edf3',
+                                    relief='flat', bd=0, highlightthickness=0)
+        self.scroll_entry.insert(0, str(self.scroll_delay))
+        self.scroll_entry.pack(side='left')
+        tk.Label(scroll_cell, text="s", font=("Consolas", 8),
+                 fg='#64748b', bg='#1c2128').pack(side='left', padx=(0,4))
+
+        self.typing_entry.bind('<KeyRelease>', lambda e: self._save_delays())
+        self.scroll_entry.bind('<KeyRelease>', lambda e: self._save_delays())
+
+        # Row 5: Reset + Scan delay + Click delay
+        reset_btn = tk.Label(grid, text="Reset Clicks", font=("Segoe UI", 8, "bold"),
+                             fg='#f59e0b', bg='#1c2128', cursor='hand2',
+                             width=12, relief='flat', padx=4, pady=3)
+        reset_btn.grid(row=5, column=0, padx=3, pady=2, sticky='ew')
+        reset_btn.bind('<Button-1>', lambda e: self.reset_clicks())
+        Tooltip(reset_btn, 'Reset the click counter to 0')
+
+        scan_cell = tk.Frame(grid, bg='#1c2128')
+        scan_cell.grid(row=5, column=1, padx=3, pady=2, sticky='ew')
+        tk.Label(scan_cell, text="Scan:", font=("Segoe UI", 8, "bold"),
+                 fg='#00d4ff', bg='#1c2128').pack(side='left', padx=(4,2))
+        self.scan_entry = tk.Entry(scan_cell, width=4, font=("Segoe UI", 8, "bold"),
+                                  bg='#1c2128', fg='#e6edf3', insertbackground='#e6edf3',
+                                  relief='flat', bd=0, highlightthickness=0)
+        self.scan_entry.insert(0, str(self.scan_delay))
+        self.scan_entry.pack(side='left')
+        tk.Label(scan_cell, text="ms", font=("Consolas", 8),
+                 fg='#64748b', bg='#1c2128').pack(side='left', padx=(0,4))
+
+        click_cell = tk.Frame(grid, bg='#1c2128')
+        click_cell.grid(row=5, column=2, padx=3, pady=2, sticky='ew')
+        tk.Label(click_cell, text="Click:", font=("Segoe UI", 8, "bold"),
+                 fg='#00d4ff', bg='#1c2128').pack(side='left', padx=(4,2))
+        self.click_entry = tk.Entry(click_cell, width=4, font=("Segoe UI", 8, "bold"),
+                                   bg='#1c2128', fg='#e6edf3', insertbackground='#e6edf3',
+                                   relief='flat', bd=0, highlightthickness=0)
+        self.click_entry.insert(0, str(self.click_delay))
+        self.click_entry.pack(side='left')
+        tk.Label(click_cell, text="ms", font=("Consolas", 8),
+                 fg='#64748b', bg='#1c2128').pack(side='left', padx=(0,4))
+
+        self.scan_entry.bind('<KeyRelease>', lambda e: self._save_delays())
+        self.click_entry.bind('<KeyRelease>', lambda e: self._save_delays())
+
+        # Position above pill
+        d.update_idletasks()
+        drawer_h = d.winfo_reqheight()
+        pill_x = self.root.winfo_x()
+        pill_y = self.root.winfo_y()
+        d.geometry(f"400x{drawer_h}+{pill_x}+{pill_y - drawer_h - 2}")
+
+        self.drawer = d
+
+    def _save_delays(self):
+        try:
+            self.scan_delay = max(0, int(self.scan_entry.get()))
+        except ValueError:
+            pass
+        try:
+            self.click_delay = max(0, int(self.click_entry.get()))
+        except ValueError:
+            pass
+        try:
+            self.typing_delay = max(0, int(self.typing_entry.get()))
+        except ValueError:
+            pass
+        try:
+            self.scroll_delay = max(0, int(self.scroll_entry.get()))
+        except ValueError:
+            pass
+        save_settings(self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay)
+
+    def click_toggle(self, kw):
+        self.enabled[kw] = not self.enabled.get(kw, True)
+        save_settings(self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay)
+        if kw in self.toggle_labels:
+            lbl, color = self.toggle_labels[kw]
+            on = self.enabled[kw]
+            lbl.configure(fg='#00d4ff' if on else '#64748b',
+                          bg='#2d333b' if on else '#1c2128')
+
+    def flash_click(self):
+        self.ui_count.configure(bg='#2d333b')
+        self.root.after(100, lambda: self.ui_count.configure(bg='#0e1117'))
+
+    def reset_clicks(self):
+        self.total_clicks = 0
+        self._pending_reset = True
+
+    def open_log_window(self):
+        if self.log_window:
+            try:
+                if self.log_window.winfo_exists():
+                    self.log_window.lift()
+                    return
+            except:
+                pass
+        w = tk.Toplevel(self.root)
+        w.title("VegaClick Logs")
+        w.geometry("400x300")
+        w.configure(bg='#0e1117')
+        w.attributes('-topmost', True)
+        self.log_text = tk.Text(w, bg='#0e1117', fg='#e6edf3', font=("Consolas", 9),
+                                relief='flat', wrap='word', state='disabled',
+                                insertbackground='#e6edf3')
+        scrollbar = tk.Scrollbar(w, command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side='right', fill='y')
+        self.log_text.pack(fill='both', expand=True, padx=4, pady=4)
+        for entry in self.log_entries:
+            self._append_log_text(entry)
+        self.log_window = w
+
+    def add_log(self, msg):
+        timestamp = time.strftime('%H:%M:%S')
+        entry = f"[{timestamp}] {msg}"
+        self.log_entries.append(entry)
+        if len(self.log_entries) > 200:
+            self.log_entries = self.log_entries[-200:]
+        if self.log_window:
+            try:
+                if self.log_window.winfo_exists():
+                    self._append_log_text(entry)
+            except:
+                pass
+
+    def _append_log_text(self, text):
+        try:
+            self.log_text.configure(state='normal')
+            self.log_text.insert('end', text + '\n')
+            self.log_text.see('end')
+            self.log_text.configure(state='disabled')
+        except:
+            pass
+
+    def open_preset_dropdown(self):
+        self.close_preset_popup()
+        popup = tk.Toplevel(self.root)
+        popup.overrideredirect(True)
+        popup.attributes('-topmost', True)
+        popup.configure(bg='#1c2128')
+        for name, desc in PRESET_DESCS.items():
+            lbl = tk.Label(popup, text=name, font=("Segoe UI", 8, "bold"),
+                           fg='#a78bfa', bg='#1c2128', cursor='hand2',
+                           padx=8, pady=4, anchor='w', width=10)
+            lbl.pack(fill='x')
+            lbl.bind('<Button-1>', lambda e, n=name: self.apply_preset(n))
+            lbl.bind('<Enter>', lambda e, l=lbl: l.configure(bg='#2d333b'))
+            lbl.bind('<Leave>', lambda e, l=lbl: l.configure(bg='#1c2128'))
+            Tooltip(lbl, desc)
+        popup.update_idletasks()
+        x = self.preset_btn.winfo_rootx()
+        y = self.preset_btn.winfo_rooty() - popup.winfo_reqheight()
+        popup.geometry(f'+{x}+{y}')
+        self.preset_popup = popup
+
+    def close_preset_popup(self):
+        if self.preset_popup:
+            try:
+                if self.preset_popup.winfo_exists():
+                    self.preset_popup.destroy()
+            except:
+                pass
+        self.preset_popup = None
+
+    def apply_preset(self, name):
+        self.preset = name
+        preset_toggles = PRESETS[name]
+        for kw in self.enabled:
+            self.enabled[kw] = preset_toggles.get(kw, True)
+        save_settings(self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay)
+        for kw, (lbl, color) in self.toggle_labels.items():
+            on = self.enabled[kw]
+            lbl.configure(fg='#00d4ff' if on else '#64748b',
+                          bg='#2d333b' if on else '#1c2128')
+        if hasattr(self, 'preset_btn'):
+            self.preset_btn.configure(text=f'\u25be {name}')
+        self.close_preset_popup()
 
     def refresh_ui(self):
-        if self.stopped: st, sc = "Stopped", "#ef4444"
-        elif self.paused: st, sc = "Paused", "#f59e0b"
+        if not self.active: st, sc = "Inactive", "#64748b"
         else: st, sc = self.status_text, self.status_color
         self.ui_status.configure(text=st, fg=sc)
-        if hasattr(self, 'cooldown') and self.cooldown > 0 and not self.stopped and not self.paused:
+        if hasattr(self, 'cooldown') and self.cooldown > 0 and self.active:
             self.ui_count.configure(text=f"{self.cooldown/1000.0:.1f}s wait", fg="#f59e0b")
         else:
             self.ui_count.configure(text=f"{self.total_clicks} clicks", fg="#64748b")
@@ -723,8 +727,6 @@ class VegaClickApp:
         threading.Thread(target=start_agentic_bridge, daemon=True).start()
 
         while True:
-            if self.stopped:
-                time.sleep(0.5); continue
             try:
                 targets = loop.run_until_complete(get_targets_async())
                 
@@ -737,11 +739,18 @@ class VegaClickApp:
                 self.pages_connected = len(pages)
 
                 if not pages:
-                    if not self.paused:
+                    if self.active:
                         self.status_text = "Searching..."
                         self.status_color = "#f59e0b"
+                        self.search_ticks += 1
+                        if self.search_ticks == 25:
+                            self.root.after(0, self.prompt_restart)
+                    else:
+                        self.status_text = "Inactive"
+                        self.status_color = "#64748b"
                 else:
-                    if not self.paused:
+                    self.search_ticks = 0
+                    if self.active:
                         max_cd = 0
                         for p in pages:
                             ws = p.get('webSocketDebuggerUrl')
@@ -749,9 +758,18 @@ class VegaClickApp:
                             try:
                                 # Force-clear stale heartbeat so new code always injects
                                 loop.run_until_complete(_cdp_eval(ws, "if(window.__vc && Date.now()-window.__vchb>8000){window.__vc=false}"))
-                                
+
+                                if getattr(self, '_pending_reset', False):
+                                    loop.run_until_complete(_cdp_eval(ws, "window.__vcc=0"))
+                                    self._pending_reset = False
                                 ov_js = f"window.__vcoverlay={'true' if self.overlay_on else 'false'}"
                                 loop.run_until_complete(_cdp_eval(ws, ov_js))
+
+                                en_js = f"window.__vcEnabled={json.dumps(self.enabled)}"
+                                loop.run_until_complete(_cdp_eval(ws, en_js))
+
+                                delay_js = f"window.__vcScanDelay={self.scan_delay};window.__vcClickDelay={self.click_delay};window.__vcTypingDelay={self.typing_delay * 1000};window.__vcScrollDelay={self.scroll_delay * 1000}"
+                                loop.run_until_complete(_cdp_eval(ws, delay_js))
 
                                 res = loop.run_until_complete(_cdp_eval(ws, FINDER_JS))
                                 if res:
@@ -768,6 +786,8 @@ class VegaClickApp:
                                         if m and m != self.last_msg:
                                             self.last_msg = m
                                             print(f"[CLICK] {m}")
+                                            self.root.after(0, self.flash_click)
+                                            self.root.after(0, lambda msg=m: self.add_log(msg))
                                         self.scan_targets = inv
                                         self.status_text = f"Active ({len(pages)}p) {inv}t"
                                         self.status_color = "#22c55e"
@@ -785,6 +805,29 @@ class VegaClickApp:
                                         cmd['res_q'].put(val)
                                 except queue.Empty: break
                         self.cooldown = max_cd
+                    else:
+                        self.status_text = "Inactive"
+                        self.status_color = "#64748b"
+                        for p in pages:
+                            ws = p.get('webSocketDebuggerUrl')
+                            if not ws: continue
+                            try:
+                                disable_js = "if(window.__vcObs)try{window.__vcObs.disconnect()}catch(e){};if(window.__vcInt)clearInterval(window.__vcInt);if(window.__vcScanInt)clearInterval(window.__vcScanInt);window.__vc=false;"
+                                loop.run_until_complete(_cdp_eval(ws, disable_js))
+                            except: pass
+
+                            # Still process command queue when inactive
+                            while not command_queue.empty():
+                                try:
+                                    cmd = command_queue.get_nowait()
+                                    if cmd['action'] == 'inject':
+                                        js = INJECT_JS % json.dumps(cmd['prompt'])
+                                        loop.run_until_complete(_cdp_eval(ws, js))
+                                    elif cmd['action'] == 'read_dom':
+                                        res = loop.run_until_complete(_cdp_eval(ws, READ_DOM_JS))
+                                        val = res.get('result',{}).get('result',{}).get('value','') if res else ''
+                                        cmd['res_q'].put(val)
+                                except queue.Empty: break
             except: pass
             time.sleep(POLL_INTERVAL)
 

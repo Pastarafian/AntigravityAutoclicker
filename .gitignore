@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Python
+__pycache__
+
+# User settings (generated at runtime)
+settings.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

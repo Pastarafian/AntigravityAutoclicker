@@ -1,52 +1,150 @@
-# VegaClick v16
+# VegaClick
 
-VegaClick v16 is a standalone, lightweight, high-performance auto-clicker/GUI overlay designed to interact with IDE chat interfaces (such as Cursor, Windsurf, or VS Code). It operates through a modern two-part architecture consisting of a Deep Scanner and a Fast Clicker.
+VegaClick is a standalone, lightweight auto-clicker overlay for Antigravity IDE. It runs as a draggable pill on your desktop and automatically clicks action buttons in the agent chat sidebar — Accept All, Allow, Run, Continue, and more — so you can let the AI work unattended.
 
-This repository serves as the dedicated, standalone home for VegaClick.
+It operates through a two-part architecture: a **Deep Scanner** (JavaScript injected via CDP) that walks the DOM to find clickable targets, and a **Python overlay** that manages the UI, settings, and CDP communication.
+
+**Works on Windows, Linux, and macOS.**
+
+---
 
 ## Features
 
-- **Deep Scanner Engine**: Recursively traverses the entire DOM tree (including Shadow DOMs and iframes) to find specifically targeted elements.
-- **Fast Clicker**: Rapidly consumes the scanner's payload, applies deduping and danger-checks, and initiates high-speed clicks with visual feedback (ripple effect) overlaid on top of the UI.
-- **Machine Learning Integration**: Built-in logic scores interactions to prioritize UI elements avoiding bad click patterns for future interactions.
-- **Agentic Bridge API**: Offers a local HTTP service (`127.0.0.1:4242`) for automated scripts to inject context and read the DOM dynamically.
-- **Minimal Overlay UI**: A draggable, translucent "pill" overlay that provides instant control (Play/Pause/Stop) and live click stats.
+### Core Clicking
+- **DOM Deep Scanner** — Recursively walks the DOM including Shadow DOMs to find action buttons
+- **Agent Sidebar Whitelist** — Only clicks elements inside `.antigravity-agent-side-panel` / `#conversation`, preventing false clicks on tabs, editor, and other UI
+- **Interactivity Filter** — Only matches actual clickable elements (`<button>`, `role=button`, `cursor:pointer`), ignoring matching text in chat messages
+- **Priority Queue** — Buttons are ranked by priority (Accept All > Allow > Trust > Run > ...) and clicked in order
+- **Deduplication** — Tracks recently clicked elements to prevent double-clicking
 
-## Setup Instructions
+### Settings Drawer
+Click the **⚙** icon to open the settings drawer above the pill:
+
+- **Per-Keyword Toggles** — Enable or disable each button type individually (Accept All, Allow, Trust, Approve, Continue, Run, Retry, OK, Yes, Apply, Relocate, Review)
+- **Presets** — Dropdown with `All`, `Safe`, `Minimal`, and `None` configurations. Hover tooltips describe what each preset enables. Selection persists across sessions.
+- **Logs** — Opens a separate resizable log window showing timestamped click history (last 200 entries)
+- **Reset Clicks** — Resets the click counter to zero (also resets the browser-side counter)
+- **Delay Controls** (all persist in `settings.json`):
+
+  | Control | Default | Unit | Description |
+  |---|---|---|---|
+  | Scan | 100 | ms | Delay after a click before rescanning the DOM |
+  | Click | 150 | ms | Total delay before next click attempt (gap = Click − Scan) |
+  | Typing | 5 | s | Cooldown after user types before clicking resumes |
+  | Scroll | 15 | s | Cooldown after user scrolls before auto-scroll resumes |
+
+### Pill UI
+- **⏸ / ▶** — Orange pause icon when inactive, green play icon when active
+- **◎** — Overlay toggle: enables/disables the ripple effect on clicked buttons
+- **✕** — Close VegaClick
+- **Click counter** — Flashes on each click to confirm activity
+- **Status text** — Shows current state: `Inactive`, `Searching...`, or `Active (Np) Xt`
+- Draggable from any part of the pill (except the interactive buttons). Dragging with the drawer open closes it.
+
+### Intelligence
+- **Machine Learning** — Scores click patterns over time, auto-blocking elements that consistently cause bad outcomes
+- **Typing Cooldown** — Pauses clicking while you're typing, resumes after the configured delay
+- **Scroll Cooldown** — Pauses auto-scroll while you're manually scrolling
+- **Post-Click Rescan** — After clicking, waits `Scan` ms, rescans the DOM, waits the remaining gap, then clicks again to catch chained dialogs
+- **Danger Check** — Blocks dangerous commands (`rm -rf`, `del /s`, `format`, etc.) from being auto-clicked
+- **Stale Heartbeat Detection** — If the scanner stops responding for 8+ seconds, it re-injects automatically
+
+### Agentic Bridge
+A local HTTP API at `127.0.0.1:4242` allows external scripts to inject prompts into the IDE chat and read DOM state programmatically.
+
+---
+
+## Setup
 
 ### Prerequisites
-
-- Python (3.10+)
-- Windows OS (Required for overlay mechanics, process footprint discovery, and taskkill cleanup routines)
-- `ws` / `websockets` Python library
+- Python 3.10+
+- Windows, Linux, or macOS
+- `websockets` Python library
 
 ### Installation
 
-1. Install the required dependenceies using `pip`:
-   ```bash
-   pip install websockets asyncio urllib3
-   ```
-   *(Note: The built-in tkinter, json, queue, os, subprocess modules are already included with Python).*
+```bash
+pip install websockets
+```
 
-2. Launch VegaClick:
-   Run the included batch script to launch the overlay:
-   ```cmd
-   launch.bat
-   ```
-   Alternatively, run it directly without a command window via:
-   ```cmd
-   pythonw vegaclick.py
-   ```
+### Launch
 
-## Usage
+**Windows:**
+```cmd
+launch.bat
+```
+Or without a console window:
+```cmd
+pythonw vegaclick.py
+```
 
-Once launched, the VegaClick interface will appear as a pill-shaped overlay on your screen. You can grab and drag this pill around.
+**Linux / macOS:**
+```bash
+python3 vegaclick.py &
+```
 
-- **▶ (Play)**: Starts or resumes the deep scanner and clicker.
-- **⏸ (Pause)**: Halts the scanning/clicking temporarily.
-- **■ (Stop)**: Stops the process and idles.
-- **◎ (Overlay Toggle)**: Enables or disables the visual "ripple" effects injected around clicked buttons.
+---
 
-## Important Note
+## How It Works
 
-VegaClick employs CDP (Chrome DevTools Protocol) to evaluate JavaScript on the page dynamically. To ensure it functions correctly with your IDE's web-based chat panels, ensure that Chrome/VSC/Electron remote debugging is active and exposing an open port in the `9222-9242` range.
+1. VegaClick scans for Antigravity pages on CDP ports `9222–9242`
+2. Every ~0.8s it injects `scanner.js` into each matching page via CDP
+3. The scanner walks the DOM, finds clickable action buttons inside the agent sidebar, and returns a target list
+4. VegaClick reads the results and updates the overlay UI
+5. The scanner's built-in clicker fires independently in the browser, respecting all cooldowns and priority rules
+6. Settings (enabled toggles, delays, preset) are synced to the browser as `window.__vc*` globals on every tick
+
+---
+
+## Settings Persistence
+
+All settings are saved to `settings.json` in the VegaClick directory:
+
+```json
+{
+  "enabled": { "accept all": true, "allow": true, "run": false, "..." : "..." },
+  "scan_delay": 100,
+  "click_delay": 150,
+  "typing_delay": 5,
+  "scroll_delay": 15,
+  "preset": "Safe"
+}
+```
+
+> **Note:** `active` (play/pause state) and `overlay` state are **not** persisted — VegaClick always starts paused with overlay enabled.
+
+---
+
+## Presets
+
+| Preset | Enabled Buttons |
+|---|---|
+| **All** | Everything |
+| **Safe** | Accept All, Allow, Trust, Continue, Retry, Review Changes |
+| **Minimal** | Accept All, Allow |
+| **None** | Nothing |
+
+---
+
+## Cross-Platform Support
+
+| Feature | Windows | Linux / macOS |
+|---|---|---|
+| Overlay UI (tkinter) | ✅ | ✅ |
+| CDP scanning & clicking | ✅ | ✅ |
+| Settings persistence | ✅ | ✅ |
+| Agentic Bridge API | ✅ | ✅ |
+| Dual-instance cleanup | `wmic` + `taskkill` | `ps aux` + `os.kill` |
+| Auto-restart Antigravity | PowerShell + `taskkill` | `pgrep` + `killall` |
+| Exe discovery | CIM / `LOCALAPPDATA` | `/proc/PID/exe` / `which` |
+
+---
+
+## Requirements
+
+Antigravity (or any Electron-based IDE) must have remote debugging enabled on a port in the `9222–9242` range. VegaClick discovers the correct port automatically.
+
+Launch Antigravity with:
+```
+--remote-debugging-port=9222
+```
