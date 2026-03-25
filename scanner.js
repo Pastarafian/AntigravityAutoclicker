@@ -431,6 +431,15 @@
       window.__vcc++;
       window.__vcm = 'Clicked ' + c.kw + ' (' + c.text.slice(0,15) + ')';
 
+      // Circuit Breaker: detect rapid looping (6+ clicks of same button in 20s)
+      window.__vcClickLog = (window.__vcClickLog || []).filter(function(x) { return Date.now() - x.t < 20000; });
+      window.__vcClickLog.push({k: c.kw, t: Date.now()});
+      var loopCnt = window.__vcClickLog.filter(function(x) { return x.k === c.kw; }).length;
+      if(loopCnt >= 6) {
+        window.__vcm = '[CIRCUIT BREAKER] Loop detected on ' + c.kw;
+        window.__vcClickLog = []; // Reset breaker
+      }
+
       // 3.5s debounce to prevent double-clicks while animations/rendering finish
       if(c.kw === 'changes overview') window.__vcOverviewAt = Date.now();
       // Clear click flag after delay

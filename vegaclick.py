@@ -793,6 +793,10 @@ class VegaClickApp:
                                         if m and m != self.last_msg:
                                             self.last_msg = m
                                             print(f"[CLICK] {m}")
+                                            if "[CIRCUIT BREAKER]" in m and getattr(self, 'active', False):
+                                                self.toggle_play()
+                                                self.status_text = "PAUSED (Loop Limit)"
+                                                self.status_color = "#ef4444"
                                             self.root.after(0, self.flash_click)
                                             self.root.after(0, lambda msg=m: self.add_log(msg))
                                         self.scan_targets = inv
