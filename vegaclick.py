@@ -24,13 +24,6 @@ PORT = 9222
 POLL_INTERVAL = 0.8
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settings.json')
 
-import socket
-try:
-    _vc_lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    _vc_lock_socket.bind(('127.0.0.1', 9842))
-except socket.error:
-    print("VegaClick is already running! Exiting.")
-    sys.exit(0)
 
 
 KEYWORDS = [
@@ -266,25 +259,41 @@ def start_agentic_bridge():
 # Process Cleanup
 # ═══════════════════════════════════════════════════════════════
 def cleanup_old_processes():
+    """Kill all stale VegaClick/autoclicker processes before this instance starts."""
     my_pid = os.getpid()
     kill_patterns = ['ide-autoclicker', 'vegaclaw', 'vegaclick', 'autoclicker']
+    killed_count = 0
     try:
         if sys.platform == 'win32':
-            result = subprocess.run(
-                ['wmic', 'process', 'where', "name='pythonw.exe' or name='python.exe'",
-                 'get', 'ProcessId,CommandLine', '/format:list'],
-                capture_output=True, text=True, timeout=5
+            # Use PowerShell Get-CimInstance (wmic is deprecated and unreliable)
+            ps_cmd = (
+                "Get-CimInstance Win32_Process | "
+                "Where-Object { $_.Name -match 'python' } | "
+                "ForEach-Object { \"$($_.ProcessId)|$($_.CommandLine)\" }"
             )
-            current_pid = None; current_cmd = None
-            for line in result.stdout.split('\n'):
+            result = subprocess.run(
+                ['powershell', '-NoProfile', '-Command', ps_cmd],
+                capture_output=True, text=True, timeout=8
+            )
+            for line in result.stdout.strip().split('\n'):
                 line = line.strip()
-                if line.startswith('CommandLine='): current_cmd = line[12:].lower()
-                elif line.startswith('ProcessId='):
-                    current_pid = int(line[10:])
-                    if current_pid != my_pid and current_cmd and any(p in current_cmd for p in kill_patterns):
-                        try: subprocess.run(['taskkill', '/PID', str(current_pid), '/F'], capture_output=True, timeout=3)
-                        except: pass
-                    current_pid = None; current_cmd = None
+                if '|' not in line:
+                    continue
+                pid_str, cmd = line.split('|', 1)
+                try:
+                    pid = int(pid_str.strip())
+                except ValueError:
+                    continue
+                cmd_lower = cmd.lower()
+                if pid != my_pid and any(p in cmd_lower for p in kill_patterns):
+                    try:
+                        subprocess.run(
+                            ['taskkill', '/PID', str(pid), '/F'],
+                            capture_output=True, timeout=3
+                        )
+                        killed_count += 1
+                    except Exception:
+                        pass
         else:
             # Linux/macOS: use ps + grep
             result = subprocess.run(
@@ -299,8 +308,16 @@ def cleanup_old_processes():
                             pid = int(parts[1])
                             if pid != my_pid:
                                 os.kill(pid, 9)
-                        except: pass
-    except: pass
+                                killed_count += 1
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+
+    if killed_count > 0:
+        # Wait for OS to fully release sockets held by killed processes
+        time.sleep(1.0)
+    return killed_count
 
 # ═══════════════════════════════════════════════════════════════
 # VegaClick v16 — DEEP SCANNER + FAST CLICKER JS
@@ -1393,13 +1410,6 @@ class VegaClickApp:
         # Telemetry is now natively provided by CDP via the FINDER_JS responses
 
         while True:
-            # Kill entire process if the hotbar UI is dead — prevents headless runaway clicker
-            try:
-                if not self.root.winfo_exists():
-                    os._exit(0)
-            except Exception:
-                os._exit(0)
-
             try:
                 targets = loop.run_until_complete(get_targets_async())
                 
@@ -1493,7 +1503,7 @@ class VegaClickApp:
                                             loop.run_until_complete(_cdp_eval(ws, "window.__vcm=''"))
                                             print(f"[CLICK] {m}")
                                             if "[CIRCUIT BREAKER]" in m and getattr(self, 'active', False):
-                                                self.toggle_play()
+                                                self.root.after(0, self.toggle_play)
                                                 self.status_text = "PAUSED (Loop Limit)"
                                                 self.status_color = "#ef4444"
                                             self.root.after(0, self.flash_click)
@@ -1582,5 +1592,16 @@ class VegaClickApp:
             os._exit(0)
 
 if __name__ == "__main__":
-    cleanup_old_processes()
+    killed = cleanup_old_processes()
+    if killed:
+        print(f"Cleaned up {killed} old VegaClick process(es)")
+
+    import socket
+    try:
+        _vc_lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _vc_lock_socket.bind(('127.0.0.1', 9842))
+    except socket.error:
+        print("VegaClick is already running! Exiting.")
+        sys.exit(0)
+
     VegaClickApp().run()

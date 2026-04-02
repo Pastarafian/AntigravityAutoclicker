@@ -151,20 +151,21 @@
   
   // ─── VISUAL HIGHLIGHTER ───
   function drawHighlighters(targets) {
-    if (window.__vcHighlightOn === false) {
-       var existing = document.querySelectorAll('.vegaclick-highlight');
-       for (var i = 0; i < existing.length; i++) existing[i].remove();
-       return;
-    }
+    try {
+      var existing = document.querySelectorAll('.vegaclick-highlight');
+      for (var i = 0; i < existing.length; i++) existing[i].remove();
+    } catch (e) {}
     
-    var existing = document.querySelectorAll('.vegaclick-highlight');
-    for (var i = 0; i < existing.length; i++) existing[i].remove();
+    if (window.__vcHighlightOn === false) return;
     
     if (!targets || targets.length === 0) return;
     
     for (var t = 0; t < targets.length; t++) {
       var el = targets[t].el;
       if (!el || !el.isConnected) continue;
+      
+      if (!el.dataset.vcAge) el.dataset.vcAge = Date.now().toString();
+      if (Date.now() - parseInt(el.dataset.vcAge) > 15000) continue;
       
       var r;
       try { r = el.getBoundingClientRect(); } catch(e) { continue; }
@@ -186,6 +187,11 @@
       
       box.appendChild(label);
       document.body.appendChild(box);
+      
+      // Safety cleanup if the scanner script ever crashes
+      (function(b) {
+        setTimeout(function() { try { b.remove(); } catch(e) {} }, 15000);
+      })(box);
     }
   }
 
@@ -411,7 +417,7 @@
             { kw='approve'; priority=80; }
           else if(t === 'continue')
             { kw='continue'; priority=75; }
-          else if(t.indexOf('run') === 0)
+          else if(t === 'run')
             { kw='run'; priority=70; }
           else if(t === 'retry')
             { kw='retry'; priority=65; }
