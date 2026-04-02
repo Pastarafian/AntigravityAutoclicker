@@ -251,7 +251,9 @@ def start_agentic_bridge():
                 self.end_headers()
                 self.wfile.write(b'{"status": "ok", "version": "v16"}')
     try:
-        HTTPServer(('127.0.0.1', 4242), Handler).serve_forever()
+        class ReusableServer(HTTPServer):
+            allow_reuse_address = True
+        ReusableServer(('127.0.0.1', 4242), Handler).serve_forever()
     except:
         pass
 
@@ -263,6 +265,28 @@ def cleanup_old_processes():
     my_pid = os.getpid()
     kill_patterns = ['ide-autoclicker', 'vegaclaw', 'vegaclick', 'autoclicker']
     killed_count = 0
+    
+    # Fast path: Try using psutil natively (100x faster than spawning PowerShell)
+    try:
+        import psutil
+        for p in psutil.process_iter(['pid', 'cmdline']):
+            try:
+                if p.info['pid'] == my_pid: continue
+                cmdline = p.info.get('cmdline')
+                if not cmdline: continue
+                cmd_lower = ' '.join(cmdline).lower()
+                if ('python' in cmd_lower or 'vegaclick' in cmd_lower) and any(kp in cmd_lower for kp in kill_patterns):
+                    p.kill()
+                    killed_count += 1
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        if killed_count > 0:
+            time.sleep(0.5)
+        return killed_count
+    except Exception:
+        pass
+
+    # Slow path fallback: Use OS-native commands
     try:
         if sys.platform == 'win32':
             # Use PowerShell Get-CimInstance (wmic is deprecated and unreliable)
@@ -463,7 +487,7 @@ class VegaClickApp:
         Tooltip(self.highlight_btn, 'Toggle clicker highlight boxes')
 
         self.scroll_paused = False
-        self.scroll_btn = tk.Label(self.root, text="\u21f5", font=("Segoe UI", 10), bg='#1c2128', fg='#64748b',
+        self.scroll_btn = tk.Label(self.root, text="\u21f5", font=("Segoe UI", 10), bg='#2d333b', fg='#00d4ff',
                                     width=2, anchor='center', bd=0, relief='flat', padx=4, pady=2)
         self.scroll_btn.pack(side='right', padx=2, pady=4)
         self.scroll_btn.bind('<Button-1>', lambda e: self.toggle_scroll())
@@ -612,7 +636,9 @@ class VegaClickApp:
     def _on_drag(self, e):
         if e.widget in (self.settings_btn, self.play_btn, self.overlay_btn, self.restart_btn, self.scroll_btn):
             return
-        self.root.geometry(f"+{self.root.winfo_x()+(e.x-self._dx)}+{self.root.winfo_y()+(e.y-self._dy)}")
+        nx = self.root.winfo_x() + (e.x - self._dx)
+        ny = self.root.winfo_y() + (e.y - self._dy)
+        self.root.geometry(f"{'+' if nx >= 0 else ''}{nx}{'+' if ny >= 0 else ''}{ny}")
 
     def _end_drag(self, e):
         """Save pill position to settings after dragging."""
@@ -730,11 +756,23 @@ class VegaClickApp:
         self.refresh_ui()
 
         try:
+            exe_path = None
             if sys.platform == 'win32':
-                # Windows: use PowerShell/CIM to find the exe path
-                cmd = 'Get-CimInstance Win32_Process -Filter "Name=\'Antigravity.exe\'" | Select-Object -ExpandProperty ExecutablePath | Select-Object -First 1'
-                res = subprocess.run(["powershell", "-Command", cmd], capture_output=True, text=True, timeout=10)
-                exe_path = res.stdout.strip()
+                # Fast path: psutil lookup
+                try:
+                    import psutil
+                    for p in psutil.process_iter(['name', 'exe']):
+                        if p.info.get('name', '').lower() == 'antigravity.exe':
+                            exe_path = p.info.get('exe')
+                            if exe_path: break
+                except Exception:
+                    pass
+
+                if not exe_path:
+                    # Slow path: use PowerShell/CIM to find the exe path
+                    cmd = 'Get-CimInstance Win32_Process -Filter "Name=\'Antigravity.exe\'" | Select-Object -ExpandProperty ExecutablePath | Select-Object -First 1'
+                    res = subprocess.run(["powershell", "-Command", cmd], capture_output=True, text=True, timeout=10)
+                    exe_path = res.stdout.strip()
                 
                 if not exe_path or not os.path.exists(exe_path):
                     local_appdata = os.getenv('LOCALAPPDATA', '')
@@ -814,8 +852,8 @@ class VegaClickApp:
 
     def toggle_scroll(self):
         self.scroll_paused = not self.scroll_paused
-        if self.scroll_paused:
-            self.scroll_btn.configure(bg='#2d333b', fg='#ef4444')
+        if not self.scroll_paused:
+            self.scroll_btn.configure(bg='#2d333b', fg='#00d4ff')
         else:
             self.scroll_btn.configure(bg='#1c2128', fg='#64748b')
 
@@ -1599,9 +1637,18 @@ if __name__ == "__main__":
     import socket
     try:
         _vc_lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _vc_lock_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         _vc_lock_socket.bind(('127.0.0.1', 9842))
     except socket.error:
         print("VegaClick is already running! Exiting.")
         sys.exit(0)
+
+    def __global_exception_handler(exctype, value, tb):
+        import traceback
+        import os
+        log_path = os.path.join(os.environ.get('TEMP', 'c:/tmp'), 'vegaclick_fatal.log')
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(''.join(traceback.format_exception(exctype, value, tb)) + "\n")
+    sys.excepthook = __global_exception_handler
 
     VegaClickApp().run()
