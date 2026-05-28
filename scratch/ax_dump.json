@@ -1,0 +1,1102 @@
+[
+  {
+    "role": "StaticText",
+    "name": "compare_arrows",
+    "id": 1007
+  },
+  {
+    "role": "StaticText",
+    "name": "to navigate",
+    "id": 1008
+  },
+  {
+    "role": "StaticText",
+    "name": "keyboard_return",
+    "id": 1009
+  },
+  {
+    "role": "StaticText",
+    "name": "to select",
+    "id": 1010
+  },
+  {
+    "role": "StaticText",
+    "name": "Agent Manager",
+    "id": 791
+  },
+  {
+    "role": "StaticText",
+    "name": "Recent",
+    "id": 792
+  },
+  {
+    "role": "StaticText",
+    "name": "windows",
+    "id": 793
+  },
+  {
+    "role": "StaticText",
+    "name": "\\windows",
+    "id": 794
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaClick",
+    "id": 795
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaClick",
+    "id": 796
+  },
+  {
+    "role": "StaticText",
+    "name": "Games",
+    "id": 797
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Games",
+    "id": 798
+  },
+  {
+    "role": "StaticText",
+    "name": "DockerClaws",
+    "id": 799
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\DockerClaws",
+    "id": 800
+  },
+  {
+    "role": "StaticText",
+    "name": "New Trading Indicators",
+    "id": 801
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\New Trading Indicators",
+    "id": 802
+  },
+  {
+    "role": "StaticText",
+    "name": "MQClawMCP",
+    "id": 803
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\MQClawMCP",
+    "id": 804
+  },
+  {
+    "role": "StaticText",
+    "name": "MarliAI",
+    "id": 805
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\MarliAI",
+    "id": 806
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaOptimizer",
+    "id": 807
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaOptimizer",
+    "id": 808
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaTechSite",
+    "id": 809
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaTechSite",
+    "id": 810
+  },
+  {
+    "role": "StaticText",
+    "name": "ProofReadingMCP",
+    "id": 811
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\ProofReadingMCP",
+    "id": 812
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaLiveServer",
+    "id": 813
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\VegaLiveServer",
+    "id": 814
+  },
+  {
+    "role": "StaticText",
+    "name": "SimpleX Bot",
+    "id": 815
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\SimpleX Bot",
+    "id": 816
+  },
+  {
+    "role": "StaticText",
+    "name": "WebDesignEngine",
+    "id": 817
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\WebDesignEngine",
+    "id": 818
+  },
+  {
+    "role": "StaticText",
+    "name": "MedicalSubstack",
+    "id": 819
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\MedicalSubstack",
+    "id": 820
+  },
+  {
+    "role": "StaticText",
+    "name": "RecentlyOpenedToolbar",
+    "id": 821
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\RecentlyOpenedToolbar",
+    "id": 822
+  },
+  {
+    "role": "StaticText",
+    "name": "ReelsFactory",
+    "id": 823
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\ReelsFactory",
+    "id": 824
+  },
+  {
+    "role": "StaticText",
+    "name": "WebDesign",
+    "id": 825
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\WebDesign",
+    "id": 826
+  },
+  {
+    "role": "StaticText",
+    "name": "MT5_Browser",
+    "id": 827
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\MT5Doom\\MT5_Browser",
+    "id": 828
+  },
+  {
+    "role": "StaticText",
+    "name": "TradingHotbar",
+    "id": 829
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\TradingHotbar",
+    "id": 830
+  },
+  {
+    "role": "StaticText",
+    "name": "MT5Doom",
+    "id": 831
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\MT5Doom",
+    "id": 832
+  },
+  {
+    "role": "StaticText",
+    "name": "ImageGen",
+    "id": 833
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\ImageGen",
+    "id": 834
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaTradingUpgradedUI",
+    "id": 835
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaTradingUpgradedUI",
+    "id": 836
+  },
+  {
+    "role": "StaticText",
+    "name": "TradingSignals",
+    "id": 837
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\TradingSignals",
+    "id": 838
+  },
+  {
+    "role": "StaticText",
+    "name": "Streamerly",
+    "id": 839
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Streamerly",
+    "id": 840
+  },
+  {
+    "role": "StaticText",
+    "name": "SessionI2P",
+    "id": 841
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\SessionI2P",
+    "id": 842
+  },
+  {
+    "role": "StaticText",
+    "name": "NimoColloseum",
+    "id": 843
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\NimoColloseum",
+    "id": 844
+  },
+  {
+    "role": "StaticText",
+    "name": "PolyGlotGitSecure",
+    "id": 845
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Coding Tools\\PolyGlotGitSecure",
+    "id": 846
+  },
+  {
+    "role": "StaticText",
+    "name": "Coding Tools",
+    "id": 847
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Coding Tools",
+    "id": 848
+  },
+  {
+    "role": "StaticText",
+    "name": "PolyGlotGitSecure",
+    "id": 849
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Coding Tools\\LocalCodingLLM\\PolyGlotGitSecure",
+    "id": 850
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaTrading",
+    "id": 851
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaTrading",
+    "id": 852
+  },
+  {
+    "role": "StaticText",
+    "name": "JuliaTrader",
+    "id": 853
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\AppData\\Roaming\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Indicators\\JuliaTrader",
+    "id": 854
+  },
+  {
+    "role": "StaticText",
+    "name": "NeuralNetTrading",
+    "id": 855
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\NeuralNetTrading",
+    "id": 856
+  },
+  {
+    "role": "StaticText",
+    "name": "GoAlgoChess",
+    "id": 857
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\GoAlgoChess",
+    "id": 858
+  },
+  {
+    "role": "StaticText",
+    "name": "ImageReading",
+    "id": 859
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\ImageReading",
+    "id": 860
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaJournal",
+    "id": 861
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaJournal",
+    "id": 862
+  },
+  {
+    "role": "StaticText",
+    "name": "ShardShops",
+    "id": 863
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\ShardShops",
+    "id": 864
+  },
+  {
+    "role": "StaticText",
+    "name": "LocalSecretary",
+    "id": 865
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\LocalSecretary",
+    "id": 866
+  },
+  {
+    "role": "StaticText",
+    "name": "GoAlgoChessIDE",
+    "id": 867
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\GoAlgoChessIDE",
+    "id": 868
+  },
+  {
+    "role": "StaticText",
+    "name": "CancerResearch",
+    "id": 869
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\CancerResearch",
+    "id": 870
+  },
+  {
+    "role": "StaticText",
+    "name": "MQL5",
+    "id": 871
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\AppData\\Roaming\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5",
+    "id": 872
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaSentry",
+    "id": 873
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaSentry",
+    "id": 874
+  },
+  {
+    "role": "StaticText",
+    "name": "SecurityTools",
+    "id": 875
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\SecurityTools",
+    "id": 876
+  },
+  {
+    "role": "StaticText",
+    "name": "SpicyStreams",
+    "id": 877
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\SpicyStreams",
+    "id": 878
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaTester",
+    "id": 879
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaTester",
+    "id": 880
+  },
+  {
+    "role": "StaticText",
+    "name": "GeminiConfig",
+    "id": 881
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\GeminiConfig",
+    "id": 882
+  },
+  {
+    "role": "StaticText",
+    "name": "Indicators",
+    "id": 883
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\AppData\\Roaming\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Indicators",
+    "id": 884
+  },
+  {
+    "role": "StaticText",
+    "name": "AgenticVPS",
+    "id": 885
+  },
+  {
+    "role": "StaticText",
+    "name": "d:\\Tools\\1. Planning\\AgenticVPS",
+    "id": 886
+  },
+  {
+    "role": "StaticText",
+    "name": "1. Planning",
+    "id": 887
+  },
+  {
+    "role": "StaticText",
+    "name": "d:\\Tools\\1. Planning",
+    "id": 888
+  },
+  {
+    "role": "StaticText",
+    "name": "MT5MCP",
+    "id": 889
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\MT5MCP",
+    "id": 890
+  },
+  {
+    "role": "StaticText",
+    "name": "TokTrader",
+    "id": 891
+  },
+  {
+    "role": "StaticText",
+    "name": "d:\\AlgoTrading\\2. InDev\\TokTrader",
+    "id": 892
+  },
+  {
+    "role": "StaticText",
+    "name": "1. Planning",
+    "id": 893
+  },
+  {
+    "role": "StaticText",
+    "name": "d:\\AlgoTrading\\1. Planning",
+    "id": 894
+  },
+  {
+    "role": "StaticText",
+    "name": "LocalSecretary",
+    "id": 895
+  },
+  {
+    "role": "StaticText",
+    "name": "d:\\Coding\\InDev\\LocalSecretary",
+    "id": 896
+  },
+  {
+    "role": "StaticText",
+    "name": "Coding",
+    "id": 897
+  },
+  {
+    "role": "StaticText",
+    "name": "d:\\Coding",
+    "id": 898
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaMCP",
+    "id": 899
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaMCP",
+    "id": 900
+  },
+  {
+    "role": "StaticText",
+    "name": "Wordplay Game",
+    "id": 901
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Wordplay Game",
+    "id": 902
+  },
+  {
+    "role": "StaticText",
+    "name": "SitePing",
+    "id": 903
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\SitePing",
+    "id": 904
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaSat",
+    "id": 905
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaSat",
+    "id": 906
+  },
+  {
+    "role": "StaticText",
+    "name": "NewMT5",
+    "id": 907
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\NewMT5",
+    "id": 908
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaCrypt",
+    "id": 909
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaCrypt",
+    "id": 910
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaCode",
+    "id": 911
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaCode",
+    "id": 912
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaTech",
+    "id": 913
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaTech",
+    "id": 914
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaAutomate2.0",
+    "id": 915
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaAutomate2.0",
+    "id": 916
+  },
+  {
+    "role": "StaticText",
+    "name": "YouTubePIP",
+    "id": 917
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\YouTubePIP",
+    "id": 918
+  },
+  {
+    "role": "StaticText",
+    "name": "Rescue Run",
+    "id": 919
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Rescue Run",
+    "id": 920
+  },
+  {
+    "role": "StaticText",
+    "name": "BTCtoG2G",
+    "id": 921
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\BTCtoG2G",
+    "id": 922
+  },
+  {
+    "role": "StaticText",
+    "name": "SoundDating",
+    "id": 923
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\SoundDating",
+    "id": 924
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaInvest",
+    "id": 925
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaInvest",
+    "id": 926
+  },
+  {
+    "role": "StaticText",
+    "name": "DeepseekVSCode Extension",
+    "id": 927
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\DeepseekVSCode Extension",
+    "id": 928
+  },
+  {
+    "role": "StaticText",
+    "name": "AntigravityMobileViewer",
+    "id": 929
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\AntigravityMobileViewer",
+    "id": 930
+  },
+  {
+    "role": "StaticText",
+    "name": "Documents",
+    "id": 931
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents",
+    "id": 932
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaProtect",
+    "id": 933
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaProtect",
+    "id": 934
+  },
+  {
+    "role": "StaticText",
+    "name": "DocuBox",
+    "id": 935
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\DocuBox",
+    "id": 936
+  },
+  {
+    "role": "StaticText",
+    "name": "Repliq",
+    "id": 937
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Repliq",
+    "id": 938
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaOCR",
+    "id": 939
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaOCR",
+    "id": 940
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaAutomate",
+    "id": 941
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaAutomate",
+    "id": 942
+  },
+  {
+    "role": "StaticText",
+    "name": "MarkdownViewer",
+    "id": 943
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\MarkdownViewer",
+    "id": 944
+  },
+  {
+    "role": "StaticText",
+    "name": "Antigravity Autoclicker",
+    "id": 945
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Antigravity Autoclicker",
+    "id": 946
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaCrypto",
+    "id": 947
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaCrypto",
+    "id": 948
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaAppTester",
+    "id": 949
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaAppTester",
+    "id": 950
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaVision",
+    "id": 951
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaVision",
+    "id": 952
+  },
+  {
+    "role": "StaticText",
+    "name": "SecureSearch",
+    "id": 953
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\SecureSearch",
+    "id": 954
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaWinMemoryCleaner",
+    "id": 955
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaWinMemoryCleaner",
+    "id": 956
+  },
+  {
+    "role": "StaticText",
+    "name": "Universal AI EA",
+    "id": 957
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Universal AI EA",
+    "id": 958
+  },
+  {
+    "role": "StaticText",
+    "name": "Testing Project",
+    "id": 959
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Testing Project",
+    "id": 960
+  },
+  {
+    "role": "StaticText",
+    "name": "Generate and Print",
+    "id": 961
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Generate and Print",
+    "id": 962
+  },
+  {
+    "role": "StaticText",
+    "name": "VegaAccounts",
+    "id": 963
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaAccounts",
+    "id": 964
+  },
+  {
+    "role": "StaticText",
+    "name": "_static_legacy_unused",
+    "id": 965
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaTradingUpgradedUI\\_static_legacy_unused",
+    "id": 966
+  },
+  {
+    "role": "StaticText",
+    "name": "_static_legacy_unused",
+    "id": 967
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\VegaTrading\\_static_legacy_unused",
+    "id": 968
+  },
+  {
+    "role": "StaticText",
+    "name": "New folder",
+    "id": 969
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\New folder",
+    "id": 970
+  },
+  {
+    "role": "StaticText",
+    "name": "NewsAlpha",
+    "id": 971
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\NewsAlpha",
+    "id": 972
+  },
+  {
+    "role": "StaticText",
+    "name": "LocalCodingLLM",
+    "id": 973
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Coding Tools\\LocalCodingLLM",
+    "id": 974
+  },
+  {
+    "role": "StaticText",
+    "name": "VKinter",
+    "id": 975
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\WebPortfolio\\VKinter",
+    "id": 976
+  },
+  {
+    "role": "StaticText",
+    "name": "WebPortfolio",
+    "id": 977
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\WebPortfolio",
+    "id": 978
+  },
+  {
+    "role": "StaticText",
+    "name": "KSPMod",
+    "id": 979
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\KSPMod",
+    "id": 980
+  },
+  {
+    "role": "StaticText",
+    "name": "A Newer Workspace",
+    "id": 981
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\A Newer Workspace",
+    "id": 982
+  },
+  {
+    "role": "StaticText",
+    "name": "Titan",
+    "id": 983
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Titan",
+    "id": 984
+  },
+  {
+    "role": "StaticText",
+    "name": "Briskli2.0",
+    "id": 985
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Briskli2.0",
+    "id": 986
+  },
+  {
+    "role": "StaticText",
+    "name": "Mity",
+    "id": 987
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Secure\\Mity",
+    "id": 988
+  },
+  {
+    "role": "StaticText",
+    "name": "GhostLLM",
+    "id": 989
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\GhostLLM",
+    "id": 990
+  },
+  {
+    "role": "StaticText",
+    "name": "TkinterPro",
+    "id": 991
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\TkinterPro",
+    "id": 992
+  },
+  {
+    "role": "StaticText",
+    "name": "TitaniumOmni",
+    "id": 993
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\TitaniumOmni",
+    "id": 994
+  },
+  {
+    "role": "StaticText",
+    "name": "Gemini Watermark remover",
+    "id": 995
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Gemini Watermark remover",
+    "id": 996
+  },
+  {
+    "role": "StaticText",
+    "name": "EasyPrompts",
+    "id": 997
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\EasyPrompts",
+    "id": 998
+  },
+  {
+    "role": "StaticText",
+    "name": "NewsAlphaMobileApp",
+    "id": 999
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\NewsAlphaMobileApp",
+    "id": 1000
+  },
+  {
+    "role": "StaticText",
+    "name": "Experts",
+    "id": 1001
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\AppData\\Roaming\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Experts",
+    "id": 1002
+  },
+  {
+    "role": "StaticText",
+    "name": "Calculator Hot Fix",
+    "id": 1003
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Calculator Hot Fix",
+    "id": 1004
+  },
+  {
+    "role": "StaticText",
+    "name": "Vega",
+    "id": 1005
+  },
+  {
+    "role": "StaticText",
+    "name": "c:\\Users\\fakej\\Documents\\Vega",
+    "id": 1006
+  }
+]

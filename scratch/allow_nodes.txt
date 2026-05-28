@@ -1,0 +1,136 @@
+Role: StaticText, Name: : There's a new "Auto-Allow Pref" toggle button inside the VegaClick settings panel. Clicking it will cycle between 
+Role: InlineTextBox, Name: : There's a new "Auto-Allow Pref" toggle button inside the 
+Role: StaticText, Name: "Allow Once"
+Role: StaticText, Name: "Allow in Workspace"
+Role: StaticText, Name: "Allow Every Time"
+Role: InlineTextBox, Name: "Allow Once"
+Role: InlineTextBox, Name: "Allow in
+Role: InlineTextBox, Name: "Allow Every Time"
+Role: StaticText, Name: <truncated 25 bytes>
+,B.a,B.b);l=$wnd.Math.max(l,w+h.i+h.g);m=$wnd.Math.max(m,A+h.j+h.f)}}for(e=new is(Mr(zGd(q).a.Kc(),new ir));gs(e);){c=RD(hs(e),74);k=atd(c);l=$wnd.Math.max(l,k.a);m=$wnd.Math.max(m,k.b)}for(d=new is(Mr(yGd(q).a.Kc(),new ir));gs(d);){c=RD(hs(d),74);if(vCd(JGd(c))!=a){k=atd(c);l=$wnd.Math.max(l,k.a);m=$wnd.Math.max(m,k.b)}}}if(f==(Ymd(),Umd)){for(r=new dMd((!a.a&&(a.a=new C5d(J4,a,10,11)),a.a));r.e!=r.i.gc();){q=RD(bMd(r),27);for(d=new is(Mr(zGd(q).a.Kc(),new ir));gs(d);){c=RD(hs(d),74);g=tsd(c);g.b==0?Ixd(c,cld,null):Ixd(c,cld,g)}}}if(!Heb(TD(Gxd(a,(vnd(),qnd))))){t=RD(Gxd(a,snd),107);p=l+t.b+t.c;o=m+t.d+t.a;Esd(a,p,o,true,true)}b.Vg()};var i4=sfb(jEe,\'FixedLayoutProvider\',1119);feb(385,137,{3:1,423:1,385:1,96:1,137:1},dtd,etd);_.cg=function htd(b){var c,d,e,f,g,h,i,j,k;if(!b){return}try{j=vhb(b,\';,;\');for(g=j,h=0,i=g.length;h', "\n        .xterm {\n          cursor: text;\n          position: relative;\n          user-select: none;\n          -ms-user-select: none;\n          -webkit-user-select: none;\n        }\n\n        .xterm.focus,\n        .xterm:focus {\n          outline: none;\n        }\n\n        .xterm .xterm-helpers {\n          position: absolute;\n          top: 0;\n          /**\n\t * The z-index of the helpers must be higher than the canvases in order for\n\t * IMEs to appear on top.\n\t */\n          z-index: 5;\n        }\n\n        .xterm .xterm-helper-textarea {\n          padding: 0;\n          border: 0;\n          margin: 0;\n          /* Move textarea out of the screen to the far left, so that the cursor is not visible */\n          position: absolute;\n          opacity: 0;\n          left: -9999em;\n          top: 0;\n          width: 0;\n          height: 0;\n          z-index: -5;\n          /** Prevent wrapping so the IME appears against the textarea at the correct position */\n          white-space: nowrap;\n          overflow: hidden;\n          resize: none;\n        }\n\n        .xterm .composition-view {\n          /* TODO: Composition position got messed up somewhere */\n          background: #000;\n          color: #fff;\n          display: none;\n          position: absolute;\n          white-space: nowrap;\n          z-index: 1;\n        }\n\n        .xterm .composition-view.active {\n          display: block;\n        }\n\n        .xterm .xterm-viewport {\n          position: absolute;\n          right: 0;\n          left: 0;\n          top: 0;\n          bottom: 0;\n        }\n\n        .xterm .xterm-screen {\n          position: relative;\n        }\n\n        .xterm .xterm-screen canvas {\n          position: absolute;\n          left: 0;\n          top: 0;\n        }\n\n        .xterm-char-measure-element {\n          display: inline-block;\n          visibility: hidden;\n          position: absolute;\n          top: 0;\n          left: -9999em;\n          line-height: normal;\n        }\n\n        .xterm.enable-mouse-events {\n          /* When mouse events are enabled (eg. tmux), revert to the standard pointer cursor */\n          cursor: default;\n        }\n\n        .xterm.xterm-cursor-pointer,\n        .xterm .xterm-cursor-pointer {\n          cursor: pointer;\n        }\n\n        .xterm.column-select.focus {\n          /* Column selection mode */\n          cursor: crosshair;\n        }\n\n        .xterm .xterm-accessibility:not(.debug),\n        .xterm .xterm-message {\n          position: absolute;\n          left: 0;\n          top: 0;\n          bottom: 0;\n          right: 0;\n          z-index: 10;\n          color: transparent;\n          pointer-events: none;\n        }\n\n        .xterm .xterm-accessibility-tree:not(.debug) *::selection {\n          color: transparent;\n        }\n\n        .xterm .xterm-accessibility-tree {\n          font-family: monospace;\n          user-select: text;\n          white-space: pre;\n        }\n\n        .xterm .xterm-accessibility-tree > div {\n          transform-origin: left;\n          width: fit-content;\n        }\n\n        .xterm .live-region {\n          position: absolute;\n          left: -9999px;\n          width: 1px;\n          height: 1px;\n          overflow: hidden;\n        }\n\n        .xterm-dim {\n          /* Dim should not apply to background, so the opacity of the foreground color is applied\n\t * explicitly in the generated class and reset to 1 here */\n          opacity: 1 !important;\n        }\n\n        .xterm-underline-1 {\n          text-decoration: underline;\n        }\n\n        .xterm-underline-2 {\n          text-decoration: double underline;\n        }\n\n        .xterm-underline-3 {\n          text-decoration: wavy underline;\n        }\n\n        .xterm-underline-4 {\n          text-decoration: dotted underline;\n        }\n\n        .xterm-underline-5 {\n          text-decoration: dashed underline;\n        }\n\n        .xterm-overline {\n          text-decoration: overline;\n        }\n\n        .xterm-overline.xterm-underline-1 {\n          text-decoration: overline underline;\n        }\n\n        .xterm-overline.xterm-underline-2 {\n          text-decoration: overline double underline;\n        }\n\n        .xterm-overline.xterm-underline-3 {\n          text-decoration: overline wavy underline;\n        }\n\n        .xterm-overline.xterm-underline-4 {\n          text-decoration: overline dotted underline;\n        }\n\n        .xterm-overline.xterm-underline-5 {\n          text-decoration: overline dashed underline;\n        }\n\n        .xterm-strikethrough {\n          text-decoration: line-through;\n        }\n\n        .xterm-screen .xterm-decoration-container .xterm-decoration {\n          z-index: 6;\n          position: absolute;\n        }\n\n        .xterm-screen\n          .xterm-decoration-container\n          .xterm-decoration.xterm-decoration-top-layer {\n          z-index: 7;\n        }\n\n        .xterm-decoration-overview-ruler {\n          z-index: 8;\n          position: absolute;\n          top: 0;\n          right: 0;\n          pointer-events: none;\n        }\n\n        .xterm-decoration-top {\n          z-index: 2;\n          position: relative;\n        }\n\n        /* Derived from vs/base/browser/ui/scrollbar/media/scrollbar.css */\n\n        /* xterm.js customization: Override xterm's cursor style */\n        .xterm .xterm-scrollable-element > .scrollbar {\n          cursor: default;\n        }\n\n        /* Arrows */\n        .xterm .xterm-scrollable-element > .scrollbar > .scra {\n          cursor: pointer;\n          font-size: 11px !important;\n        }\n\n        .xterm .xterm-scrollable-element > .visible {\n          opacity: 1;\n\n          /* Background rule added for IE9 - to allow clicks on dom node */\n          background: rgba(0, 0, 0, 0);\n\n          transition: opacity 100ms linear;\n          /* In front of peek view */\n          z-index: 11;\n        }\n\n        .xterm .xterm-scrollable-element > .invisible {\n          opacity: 0;\n          pointer-events: none;\n        }\n\n        .xterm .xterm-scrollable-element > .invisible.fade {\n          transition: opacity 800ms linear;\n        }\n\n        /* Scrollable Content Inset Shadow */\n        .xterm .xterm-scrollable-element > .shadow {\n          position: absolute;\n          display: none;\n        }\n\n        .xterm .xterm-scrollable-element > .shadow.top {\n          display: block;\n          top: 0;\n          left: 3px;\n          height: 3px;\n          width: 100%;\n          box-shadow: var(--vscode-scrollbar-shadow, #000) 0 6px 6px -6px inset;\n        }\n\n        .xterm .xterm-scrollable-element > .shadow.left {\n          display: block;\n          top: 3px;\n          left: 0;\n          height: 100%;\n          width: 3px;\n          box-shadow: var(--vscode-scrollbar-shadow, #000) 6px 0 6px -6px inset;\n        }\n\n        .xterm .xterm-scrollable-element > .shadow.top-left-corner {\n          display: block;\n          top: 0;\n          left: 0;\n          height: 3px;\n          width: 3px;\n        }\n\n        .xterm .xterm-scrollable-element > .shadow.top.left {\n          box-shadow: var(--vscode-scrollbar-shadow, #000) 6px 0 6px -6px inset;\n        }\n      "]
+
+Role: StaticText, Name: python -c "from bs4 import BeautifulSoup; html=open('scratch/antigravity_dom.html', encoding='utf-8').read(); soup=BeautifulSoup(html, 'html.parser'); print([tag.text.strip() for tag in soup.find_all(string=True) if 'Allow' in tag.text])"
+Role: StaticText, Name: python -c "from bs4 import BeautifulSoup; html=open('scratch/antigravity_dom.html', encoding='utf-8').read(); soup=BeautifulSoup(html, 'html.parser'); print([tag.text.strip() for tag in soup.find_all(string=True) if 'Allow' in tag.text])"
+Role: StaticText, Name: [2026-05-27 07:02:49] ============================================================
+[2026-05-27 07:02:49] VegaClick v16 starting �?" PID=10520 Python=3.13.5 Platform=win32
+[2026-05-27 07:02:49] Script path: C:\Users\fakej\Documents\VegaClick\vegaclick.py
+[2026-05-27 07:02:49] Log file: C:\Users\fakej\Documents\VegaClick\debug_logs\2026-05-27_vegaclick-debug\debug.log
+[2026-05-27 07:02:49] ============================================================
+[2026-05-27 07:02:49] cleanup_old_processes: starting (my_pid=10520)
+[2026-05-27 07:02:49] cleanup_old_processes: killed 0 (psutil path)
+[2026-05-27 07:02:49] Socket lock acquired on 127.0.0.1:9842
+[2026-05-27 07:02:49] Constructing VegaClickApp...
+[2026-05-27 07:02:49] Initializing VegaClickApp...
+[2026-05-27 07:02:49] Loading settings from disk...
+[2026-05-27 07:02:49] Settings loaded: preset=All scan=25ms click=50ms typing=5s scroll=15s cb=3/20s idle=5min autostart=True pref_allow=allow in workspace enabled_kw=15/15 pill=(969,796)
+[2026-05-27 07:02:49] UI pill geometry: 530x30 at (969,796), screen=(1536x864)
+[2026-05-27 07:02:49] Worker loop starting
+[2026-05-27 07:02:49] Worker thread started
+[2026-05-27 07:02:49] Quota thread started
+[2026-05-27 07:02:49] Global hotkey registered
+[2026-05-27 07:02:49] Agentic bridge thread spawned
+[2026-05-27 07:02:49] Init complete �?" UI refresh loop started
+[2026-05-27 07:02:49] Entering Tk mainloop
+[2026-05-27 07:02:50] Agentic Bridge starting on 127.0.0.1:4242
+[2026-05-27 07:02:54] Pill dragged: (969,796) -> (874,844)
+[2026-05-27 07:02:54] _save_all: preset=All scan=25 click=50 typing=5 scroll=15 cb=3/20 idle=5min
+[2026-05-27 07:02:54] Settings saved: preset=All scan=25ms click=50ms pill=(874,844)
+[2026-05-27 07:02:55] toggle_play: active set to True
+[2026-05-27 07:03:02] toggle_scroll: from False to True
+
+Role: StaticText, Name: python -c "import re; print(bool(re.match(r'^[^a-zA-Z0-9]*(\d+)[^a-zA-Z0-9]*', '1) allow in workspace')))"
+Role: StaticText, Name: python -c "import re; print(bool(re.match(r'^[^a-zA-Z0-9]*(\d+)[^a-zA-Z0-9]*', '1) allow in workspace')))"
+Role: StaticText, Name: python -c "import json; data = json.load(open('scratch/axtree.json', encoding='utf-8')); nodes = data.get('result', {}).get('nodes', []); [print(f'Role: {n.get(\"role\",\"\").get(\"value\",\"\")}, Name: {n.get(\"name\",\"\").get(\"value\",\"\")}') for n in nodes if 'allow' in str(n.get('name',{})).lower()]"
+Role: StaticText, Name: python -c "import json; data = json.load(open('scratch/axtree.json', encoding='utf-8')); nodes = data.get('result', {}).get('nodes', []); [print(f'Role: {n.get(\"role\",\"\").get(\"value\",\"\")}, Name: {n.get(\"name\",\"\").get(\"value\",\"\")}') for n in nodes if 'allow' in str(n.get('name',{})).lower()]"
+Role: StaticText, Name: python -c " import json data = json.load(open('scratch/axtree.json', encoding='utf-8')) nodes = data.get('result', {}).get('nodes', []) for n in nodes: name_obj = n.get('name', {}) if 'allow' in str(name_obj).lower(): role = n.get('role', {}).get('value', '') name = name_obj.get('value', '') print(f'Role: {role}, Name: {name}') "
+Role: StaticText, Name: python -c "
+import json
+data = json.load(open('scratch/axtree.json', encoding='utf-8'))
+nodes = data.get('result', {}).get('nodes', [])
+for n in nodes:
+    name_obj = n.get('name', {})
+    if 'allow' in str(name_obj).lower():
+        role = n.get('role', {}).get('value', '')
+        name = name_obj.get('value', '')
+        print(f'Role: {role}, Name: {name}')
+"
+Role: StaticText, Name: 33:def debug_log(msg):
+85:    def __init__(self, widget, text):
+91:    def show(self, e=None):
+106:    def hide(self, e=None):
+112:    def __init__(self, parent, text, color='#a78bfa', duration=3500, on_click=None):
+144:    def _handle_click(self, e):
+149:    def fade_in(self, alpha=0.0):
+158:    def fade_out(self, alpha=0.95):
+167:def load_settings():
+190:        debug_log(f"Settings load FAILED ({e}), using defaults")
+193:def save_settings(enabled, scan_delay=100, click_delay=150, preset='All', typing_delay=5, scroll_delay=15,
+248:def start_agentic_bridge():
+251:        def log_message(self, format, *args): pass
+252:        def do_POST(self):
+270:        def do_GET(self):
+298:def cleanup_old_processes():
+392:async def get_targets_async():
+394:    async def probe(port):
+422:async def _cdp_eval(ws_url, js_code):
+439:    def __init__(self):
+474:        # Use saved position if available, otherwise default to bottom-right
+495:        self.ui_status.tag_configure('default', foreground='#e6edf3')
+577:    def _fetch_quota_worker(self):
+579:        ctx = ssl.create_default_context()
+627:                                    model_color = 'default'
+693:    def _start_drag(self, e):
+699:    def _on_drag(self, e):
+706:    def _end_drag(self, e):
+716:    def on_close(self):
+721:        def _force_exit():
+728:    def prompt_restart(self):
+742:    def restart_clicker(self):
+781:    def show_toast(self, text, color='#a78bfa', on_click=None):
+785:    def focus_ide(self):
+796:            def enum_cb(hwnd, lparam):
+815:    def restart_antigravity(self):
+914:    def toggle_overlay(self):
+919:    def toggle_highlight(self):
+924:    def toggle_scroll(self):
+934:    def toggle_play(self):
+947:    def _save_all(self):
+956:    def _register_global_hotkey(self):
+960:        def _hotkey_listener():
+987:    def _play_idle_alert(self):
+990:        def _beep():
+1003:    def toggle_auto_start(self):
+1046:    def toggle_settings(self):
+1052:    def close_drawer(self):
+1062:    def open_drawer(self):
+1298:    def toggle_pref_allow(self):
+1309:    def _save_delays(self):
+1341:    def click_toggle(self, kw):
+1351:    def flash_click(self):
+1354:    def restart_ide(self):
+1355:        def _bg():
+1379:    def reset_clicks(self):
+1383:    def open_log_window(self):
+1407:    def add_log(self, msg):
+1420:    def _append_log_text(self, text):
+1429:    def open_preset_dropdown(self):
+1457:    def close_preset_popup(self):
+1466:    def apply_preset(self, name):
+1481:    def refresh_ui(self):
+1551:    def worker_loop(self):
+1559:    async def async_worker_loop(self):
+1585:                targets = await get_targets_async()
+1732:                                    def rank(t):
+1870:    def run(self):
+1902:    def __global_exception_handler(exctype, value, tb):
+
+Role: InlineTextBox, Name: \n          /* Background rule added for IE9 - to allow clicks on dom
+Role: InlineTextBox, Name: python -c "from bs4 import BeautifulSoup; html=open('scratch/antigravity_dom.html', encoding='utf-8').read(); soup=BeautifulSoup(html, 'html.parser'); print([tag.text.strip() for tag in soup.find_all(string=True) if 'Allow' in tag.text])"
+Role: InlineTextBox, Name: ring=True) if 'Allow' in tag.text])"
+Role: InlineTextBox, Name: typing=5s scroll=15s cb=3/20s idle=5min autostart=True pref_allow=allo
+Role: InlineTextBox, Name: python -c "import re; print(bool(re.match(r'^[^a-zA-Z0-9]*(\d+)[^a-zA-Z0-9]*', '1) allow in workspace')))"
+Role: InlineTextBox, Name: (\d+)[^a-zA-Z0-9]*', '1) allow in workspace')))"
+Role: InlineTextBox, Name: python -c "import json; data = json.load(open('scratch/axtree.json', encoding='utf-8')); nodes = data.get('result', {}).get('nodes', []); [print(f'Role: {n.get(\"role\",\"\").get(\"value\",\"\")}, Name: {n.get(\"name\",\"\").get(\"value\",\"\")}') for n in nodes if 'allow' in str(n.get('name',{})).lower()]"
+Role: InlineTextBox, Name: python -c " import json data = json.load(open('scratch/axtree.json', encoding='utf-8')) nodes = data.get('result', {}).get('nodes', []) for n in nodes: name_obj = n.get('name', {}) if 'allow' in str(name_obj).lower(): role = n.get('role', {}).get('value', '') name = name_obj.get('value', '') print(f'Role: {role}, Name: {name}') "
+Role: InlineTextBox, Name: if 'allow' in str(name_obj).lower():
+Role: InlineTextBox, Name: 1298:    def toggle_pref_allow(self):

@@ -40,23 +40,31 @@ def debug_log(msg):
         pass
 
 KEYWORDS = [
-    ('accept all', 'Accept All', '#22c55e', 'Accept all pending code changes'),
-    ('allow', 'Allow', '#22c55e', 'Allow tool access for this conversation'),
-    ('trust', 'Trust', '#22c55e', 'Trust a workspace or extension'),
-    ('approve', 'Approve', '#6366f1', 'Approve a pending action'),
-    ('continue', 'Continue', '#22c55e', 'Continue the current operation'),
-    ('run', 'Run', '#3b82f6', 'Run a terminal command'),
-    ('retry', 'Retry', '#f59e0b', 'Retry a failed operation'),
-    ('ok', 'OK', '#64748b', 'Confirm a dialog prompt'),
-    ('yes', 'Yes', '#64748b', 'Answer yes to a confirmation'),
-    ('apply', 'Apply', '#64748b', 'Apply settings or changes'),
-    ('relocate', 'Relocate', '#64748b', 'Relocate a file or resource'),
-    ('send all', 'Send All', '#3b82f6', 'Send all pending prompts after task cancel'),
-    ('changes overview', 'Overview', '#a78bfa', 'Open the Changes Overview panel'),
+    ('always allow', 'Always Allow', '#22c55e', 'Always allow tool access', 'both'),
+    ('allow forever', 'Allow Forever', '#22c55e', 'Allow tool access forever', 'both'),
+    ('accept all', 'Accept All', '#22c55e', 'Accept all pending code changes', 'ide'),
+    ('allow', 'Allow', '#22c55e', 'Allow tool access for this conversation', 'both'),
+    ('trust', 'Trust', '#22c55e', 'Trust a workspace or extension', 'ide'),
+    ('approve', 'Approve', '#6366f1', 'Approve a pending action', 'both'),
+    ('continue', 'Continue', '#22c55e', 'Continue the current operation', 'both'),
+    ('run', 'Run', '#3b82f6', 'Run a terminal command', 'ide'),
+    ('retry', 'Retry', '#f59e0b', 'Retry a failed operation', 'both'),
+    ('ok', 'OK', '#64748b', 'Confirm a dialog prompt', 'both'),
+    ('yes', 'Yes', '#64748b', 'Answer yes to a confirmation', 'both'),
+    ('apply', 'Apply', '#64748b', 'Apply settings or changes', 'ide'),
+    ('relocate', 'Relocate', '#64748b', 'Relocate a file or resource', 'ide'),
+    ('send all', 'Send All', '#3b82f6', 'Send all pending prompts after task cancel', 'ide'),
+    ('changes overview', 'Overview', '#a78bfa', 'Open the Changes Overview panel', 'ide'),
+    ('needs attention', 'Needs Attention', '#f43f5e', 'Auto-switch to blocked subagent', 'both'),
+    ('switch project', 'Switch Project', '#f43f5e', 'Auto-switch to blocked project', 'both'),
+    ('switch workspace', 'Switch Workspace', '#f43f5e', 'Auto-switch to blocked workspace', 'both'),
+    ('go back', 'Go Back', '#64748b', 'Return to previous chat', 'both'),
 ]
 
+COUNTABLE_ACTIONS = {'submit', 'retry', 'approve', 'continue', 'run', 'accept all'}
+
 PRESETS = {
-    'All': {kw: True for kw, _, _, _ in KEYWORDS},
+    'All': {kw: True for kw, _, _, _, _ in KEYWORDS},
     'Safe': {
         'accept all': True, 'allow': True, 'trust': True,
         'approve': False, 'continue': True, 'run': False,
@@ -69,7 +77,7 @@ PRESETS = {
         'retry': False, 'ok': False, 'yes': False,
         'apply': False, 'relocate': False, 'send all': False, 'changes overview': False,
     },
-    'None': {kw: False for kw, _, _, _ in KEYWORDS},
+    'None': {kw: False for kw, _, _, _, _ in KEYWORDS},
 }
 
 PRESET_DESCS = {
@@ -168,7 +176,7 @@ def load_settings():
         with open(SETTINGS_FILE, 'r') as f:
             data = json.load(f)
             saved = data.get('enabled', {})
-            enabled = {kw: saved.get(kw, True) for kw, _, _, _ in KEYWORDS}
+            enabled = {kw: saved.get(kw, True) for kw, _, _, _, _ in KEYWORDS}
             scan_delay = data.get('scan_delay', 100)
             click_delay = data.get('click_delay', 150)
             preset = data.get('preset', 'All')
@@ -180,21 +188,23 @@ def load_settings():
             pill_y = data.get('pill_y', None)
             idle_alert_minutes = data.get('idle_alert_minutes', 5)
             auto_start = data.get('auto_start', False)
+            pref_allow = data.get('pref_allow', 'allow in workspace')
             enabled_count = sum(1 for v in enabled.values() if v)
-            debug_log(f"Settings loaded: preset={preset} scan={scan_delay}ms click={click_delay}ms typing={typing_delay}s scroll={scroll_delay}s cb={cb_clicks}/{cb_seconds}s idle={idle_alert_minutes}min autostart={auto_start} enabled_kw={enabled_count}/{len(enabled)} pill=({pill_x},{pill_y})")
-            return enabled, scan_delay, click_delay, preset, typing_delay, scroll_delay, cb_clicks, cb_seconds, pill_x, pill_y, idle_alert_minutes, auto_start
+            debug_log(f"Settings loaded: preset={preset} scan={scan_delay}ms click={click_delay}ms typing={typing_delay}s scroll={scroll_delay}s cb={cb_clicks}/{cb_seconds}s idle={idle_alert_minutes}min autostart={auto_start} pref_allow={pref_allow} enabled_kw={enabled_count}/{len(enabled)} pill=({pill_x},{pill_y})")
+            return enabled, scan_delay, click_delay, preset, typing_delay, scroll_delay, cb_clicks, cb_seconds, pill_x, pill_y, idle_alert_minutes, auto_start, pref_allow
     except Exception as e:
         debug_log(f"Settings load FAILED ({e}), using defaults")
-        return {kw: True for kw, _, _, _ in KEYWORDS}, 100, 150, 'All', 5, 15, 3, 20, None, None, 5, False
+        return {kw: True for kw, _, _, _, _ in KEYWORDS}, 100, 150, 'All', 5, 15, 3, 20, None, None, 5, False, 'allow in workspace'
 
 def save_settings(enabled, scan_delay=100, click_delay=150, preset='All', typing_delay=5, scroll_delay=15,
-                  cb_clicks=3, cb_seconds=20, pill_x=None, pill_y=None, idle_alert_minutes=5, auto_start=False):
+                  cb_clicks=3, cb_seconds=20, pill_x=None, pill_y=None, idle_alert_minutes=5, auto_start=False, pref_allow='allow in workspace'):
     try:
         data = {
             'enabled': enabled, 'scan_delay': scan_delay, 'click_delay': click_delay,
             'preset': preset, 'typing_delay': typing_delay, 'scroll_delay': scroll_delay,
             'cb_clicks': cb_clicks, 'cb_seconds': cb_seconds,
             'idle_alert_minutes': idle_alert_minutes, 'auto_start': auto_start,
+            'pref_allow': pref_allow,
         }
         if pill_x is not None:
             data['pill_x'] = pill_x
@@ -217,16 +227,24 @@ INJECT_JS = """
     var text = %s;
     var box = document.querySelector('textarea, [contenteditable="true"]') || document.querySelector('input[type="text"]');
     if (!box) return "No input box found";
+    box.focus();
     if (box.tagName === 'TEXTAREA' || box.tagName === 'INPUT') {
         box.value = text;
         box.dispatchEvent(new Event('input', {bubbles: true}));
+        box.dispatchEvent(new Event('change', {bubbles: true}));
     } else {
         box.innerText = text;
         box.dispatchEvent(new Event('input', {bubbles: true}));
+        box.dispatchEvent(new Event('change', {bubbles: true}));
     }
-    var btn = document.querySelector('button[type="submit"]') || (box.parentElement && box.parentElement.querySelector('button'));
-    if (btn) btn.click();
-    else box.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true}));
+    var btn = document.querySelector('button[type="submit"], button[aria-label*="Send"], button[title*="Send"], .send-button, [data-testid*="send"]') || (box.parentElement && box.parentElement.querySelector('button'));
+    if (btn) {
+        btn.click();
+    } else {
+        box.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true}));
+        box.dispatchEvent(new KeyboardEvent('keypress', {key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true}));
+        box.dispatchEvent(new KeyboardEvent('keyup', {key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true}));
+    }
     return "Injected prompt";
 })()
 """
@@ -372,9 +390,6 @@ def cleanup_old_processes():
 # ═══════════════════════════════════════════════════════════════
 # VegaClick — DEEP SCANNER + FAST CLICKER JS
 # ═══════════════════════════════════════════════════════════════
-_scanner_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scanner.js')
-with open(_scanner_path, 'r', encoding='utf-8') as _f:
-    FINDER_JS = _f.read()
 
 # ═══════════════════════════════════════════════════════════════
 # CDP Helpers
@@ -385,12 +400,27 @@ async def get_targets_async():
     async def probe(port):
         try:
             loop = asyncio.get_event_loop()
+            import urllib.request
             data = await asyncio.wait_for(
                 loop.run_in_executor(None, lambda: urllib.request.urlopen(f"http://127.0.0.1:{port}/json", timeout=0.3).read()),
                 timeout=0.5)
             return json.loads(data)
         except: return []
-    results = await asyncio.gather(*[probe(p) for p in range(9222, 9242)], return_exceptions=True)
+        
+    ports_to_try = list(range(9222, 9242))
+    import os
+    appdata = os.environ.get('APPDATA', '')
+    if appdata:
+        dtp = os.path.join(appdata, 'Antigravity', 'DevToolsActivePort')
+        if os.path.exists(dtp):
+            try:
+                with open(dtp, 'r') as f:
+                    port_str = f.readline().strip()
+                    if port_str.isdigit():
+                        ports_to_try.append(int(port_str))
+            except: pass
+
+    results = await asyncio.gather(*[probe(p) for p in set(ports_to_try)], return_exceptions=True)
     for r in results:
         if isinstance(r, list): all_targets.extend(r)
     return all_targets
@@ -430,7 +460,7 @@ class VegaClickApp:
         self.pages_connected = 0
         self.scan_targets = 0
         self.search_ticks = 0
-        self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay, self.cb_clicks, self.cb_seconds, self.pill_x, self.pill_y, self.idle_alert_minutes, self.auto_start = load_settings()
+        self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay, self.cb_clicks, self.cb_seconds, self.pill_x, self.pill_y, self.idle_alert_minutes, self.auto_start, self.pref_allow = load_settings()
         debug_log(f"UI pill geometry: 530x30 at ({self.pill_x},{self.pill_y}), screen=({self.root.winfo_screenwidth()}x{self.root.winfo_screenheight()})")
         self.drawer = None
         self.toggle_labels = {}
@@ -508,6 +538,13 @@ class VegaClickApp:
         self.scroll_btn.pack(side='right', padx=2, pady=4)
         self.scroll_btn.bind('<Button-1>', lambda e: self.toggle_scroll())
         self.scroll_tt = Tooltip(self.scroll_btn, 'Auto-scroll: Active')
+
+        self.switcher_on = False
+        self.switcher_btn = tk.Label(self.root, text="⇄", font=("Segoe UI", 10), bg='#2d333b', fg='#64748b',
+                                    width=2, anchor='center', bd=0, relief='flat', padx=4, pady=2)
+        self.switcher_btn.pack(side='right', padx=2, pady=4)
+        self.switcher_btn.bind('<Button-1>', lambda e: self.toggle_switcher())
+        self.switcher_tt = Tooltip(self.switcher_btn, 'Auto-switch Project: Inactive')
 
         self.play_btn = tk.Label(self.root, text='\u23f8', font=("Segoe UI", 10), bg='#1c2128', fg='#f59e0b',
                                  width=2, anchor='center', bd=0, relief='flat', padx=4, pady=2)
@@ -667,13 +704,13 @@ class VegaClickApp:
             time.sleep(2.0)
 
     def _start_drag(self, e):
-        if e.widget in (self.settings_btn, self.play_btn, self.overlay_btn, self.highlight_btn, self.restart_btn, self.scroll_btn):
+        if e.widget in (self.settings_btn, self.play_btn, self.overlay_btn, self.highlight_btn, self.restart_btn, self.scroll_btn, self.switcher_btn):
             return
         self._dx, self._dy = e.x_root, e.y_root
         self._orig_x, self._orig_y = self.root.winfo_x(), self.root.winfo_y()
         self.close_drawer()
     def _on_drag(self, e):
-        if e.widget in (self.settings_btn, self.play_btn, self.overlay_btn, self.highlight_btn, self.restart_btn, self.scroll_btn):
+        if e.widget in (self.settings_btn, self.play_btn, self.overlay_btn, self.highlight_btn, self.restart_btn, self.scroll_btn, self.switcher_btn):
             return
         nx = self._orig_x + (e.x_root - self._dx)
         ny = self._orig_y + (e.y_root - self._dy)
@@ -907,6 +944,15 @@ class VegaClickApp:
             self.scroll_btn.configure(bg='#1c2128', fg='#64748b')
             if hasattr(self, 'scroll_tt'): self.scroll_tt.text = 'Auto-scroll: Paused'
 
+    def toggle_switcher(self):
+        self.switcher_on = not getattr(self, 'switcher_on', False)
+        if self.switcher_on:
+            self.switcher_btn.configure(bg='#2d333b', fg='#f43f5e')
+            if hasattr(self, 'switcher_tt'): self.switcher_tt.text = 'Auto-switch Project: Active'
+        else:
+            self.switcher_btn.configure(bg='#1c2128', fg='#64748b')
+            if hasattr(self, 'switcher_tt'): self.switcher_tt.text = 'Auto-switch Project: Inactive'
+
     def toggle_play(self):
         self.active = not getattr(self, 'active', True)
         debug_log(f"toggle_play: active set to {self.active}")
@@ -926,7 +972,7 @@ class VegaClickApp:
         save_settings(
             self.enabled, self.scan_delay, self.click_delay, self.preset,
             self.typing_delay, self.scroll_delay, self.cb_clicks, self.cb_seconds,
-            self.pill_x, self.pill_y, self.idle_alert_minutes, self.auto_start
+            self.pill_x, self.pill_y, self.idle_alert_minutes, self.auto_start, self.pref_allow
         )
 
     def _register_global_hotkey(self):
@@ -1062,7 +1108,7 @@ class VegaClickApp:
         grid.pack(fill='x', padx=6, pady=(0, 8))
 
         self.toggle_labels = {}
-        for idx, (kw, display, color, desc) in enumerate(KEYWORDS):
+        for idx, (kw, display, color, desc, ctx) in enumerate(KEYWORDS):
             row = idx // 3
             col = idx % 3
             on = self.enabled.get(kw, True)
@@ -1219,9 +1265,19 @@ class VegaClickApp:
 
 
 
+        # Auto-Allow Preference
+        pref_cell = tk.Frame(grid, bg='#1c2128')
+        pref_cell.grid(row=base_row + 3, column=0, columnspan=3, padx=3, pady=2, sticky='ew')
+        tk.Label(pref_cell, text="Auto-Allow Pref:", font=("Segoe UI", 8, "bold"), fg='#a78bfa', bg='#1c2128').pack(side='left', padx=(4,2))
+        
+        self.pref_btn = tk.Label(pref_cell, text=f"\u25be {self.pref_allow.title()}", font=("Segoe UI", 8, "bold"), fg='#e6edf3', bg='#2d333b', cursor='hand2', padx=4, pady=2)
+        self.pref_btn.pack(side='left', fill='x', expand=True, padx=(2,4))
+        self.pref_btn.bind('<Button-1>', lambda e: self.toggle_pref_allow())
+        Tooltip(self.pref_btn, 'Cycle preferred auto-allow option (Once / Workspace / Every Time)')
+
         # Legend row
         row8 = tk.Frame(grid, bg='#0e1117')
-        row8.grid(row=base_row + 3, column=0, columnspan=3, padx=3, pady=(4, 2), sticky='ew')
+        row8.grid(row=base_row + 4, column=0, columnspan=3, padx=3, pady=(4, 2), sticky='ew')
         
         a_lbl = tk.Label(row8, text="A", font=("Consolas", 8, "bold"),
 
@@ -1260,6 +1316,17 @@ class VegaClickApp:
         d.geometry(f"530x{drawer_h}+{pill_x}+{pill_y - drawer_h - 2}")
         d.deiconify()  # Show now that geometry is set
         d.attributes('-alpha', 0.95) # Restore transparency now that it's positioned
+
+    def toggle_pref_allow(self):
+        opts = ['allow once', 'allow in workspace', 'allow every time']
+        try:
+            idx = opts.index(self.pref_allow)
+        except ValueError:
+            idx = 0
+        self.pref_allow = opts[(idx + 1) % len(opts)]
+        if hasattr(self, 'pref_btn'):
+            self.pref_btn.configure(text=f"\u25be {self.pref_allow.title()}")
+        self._save_all()
 
     def _save_delays(self):
         try:
@@ -1502,150 +1569,507 @@ class VegaClickApp:
 
     # Telemetry is now automatically extracted via CDP in JS and populated into self.telemetry.
 
+
     def worker_loop(self):
         debug_log("Worker loop starting")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         threading.Thread(target=start_agentic_bridge, daemon=True).start()
         debug_log("Agentic bridge thread spawned")
-        # Telemetry is now natively provided by CDP via the FINDER_JS responses
+        loop.run_until_complete(self.async_worker_loop())
+
+    async def async_worker_loop(self):
+        import websockets
+        import re
+        active_connections = {}
+        ide_flags = {}
+        
+        auto_scroll_js = """
+        (function() {
+            var panels = document.querySelectorAll('#conversation');
+            for(var i=0; i<panels.length; i++){
+                var el = panels[i];
+                if(el.closest('.left-sidebar, aside, .sidebar, .part.sidebar')) continue;
+                if(el.scrollHeight <= el.clientHeight + 80) continue;
+                var cs = window.getComputedStyle(el);
+                if(cs.overflowY !== 'auto' && cs.overflowY !== 'scroll') continue;
+                var rect = el.getBoundingClientRect();
+                if(rect.width < 150 || rect.height < 150) continue;
+                var distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if(distFromBottom > 50){
+                    el.scrollTop = el.scrollHeight;
+                }
+            }
+        })()
+        """
 
         while True:
             try:
-                targets = loop.run_until_complete(get_targets_async())
-                debug_log(f"Poll: {len(targets)} total CDP targets found")
-                
-                # WHITELIST: Inject into Antigravity main pages AND the isolated 'antigravity-panel' Webview iframes
+                targets = await get_targets_async()
                 pages = [t for t in targets 
                          if t.get('type') in ('page', 'iframe') 
                          and t.get('webSocketDebuggerUrl')
-                         and ('Antigravity' in t.get('title', '') or 'antigravity-panel' in t.get('url', ''))]
+                         and ('Antigravity' in t.get('title', '') or 'antigravity-panel' in t.get('url', '') or '127.0.0.1' in t.get('url', ''))]
                 self.pages_connected = len(pages)
-                
-                if not getattr(self, '_last_pages_logged', None) == self.pages_connected:
-                    debug_log(f"Valid CDP Pages Found: {self.pages_connected}")
-                    self._last_pages_logged = self.pages_connected
 
                 if not pages:
                     if self.active:
                         self.status_text = "Searching..."
                         self.status_color = "#f59e0b"
                         self.search_ticks += 1
-                        if self.search_ticks % 5 == 0:
-                            debug_log(f"No valid pages found — search_ticks={self.search_ticks}")
                         if self.search_ticks == 25:
-                            debug_log("search_ticks hit 25 — prompting restart")
                             self.root.after(0, self.prompt_restart)
                     else:
                         self.status_text = "Inactive"
                         self.status_color = "#64748b"
+                        
+                    for ws in list(active_connections.values()):
+                        await ws.close()
+                    active_connections.clear()
                 else:
                     self.search_ticks = 0
+                    a_count = 0; w_count = 0; c_count = 0
+                    max_cd = 0
+
                     if self.active:
-                        max_cd = 0
-                        a_count = 0  # Active (agent thinking)
-                        w_count = 0  # Waiting (buttons present)
-                        c_count = 0  # Complete (idle)
                         for p in pages:
-                            ws = p.get('webSocketDebuggerUrl')
-                            if not ws: continue
-                            try:
-                                # Force-clear stale heartbeat so new code always injects
-                                # Handle clicker restart: nuke all JS state to force fresh injection
-                                if getattr(self, '_pending_clicker_reset', False):
-                                    debug_log(f"Sending clicker reset JS to page: {p.get('title', '?')[:40]}")
-                                    loop.run_until_complete(_cdp_eval(ws, "window.__vc=false;window.__vcc=0;window.__vcm='';window.__vcClicked={};window.__vcClickLog=[];window.__vcTargets=[];window.__vcAllMatched=0;window.__vcDotsAt=0;if(window.__vcObs)try{window.__vcObs.disconnect()}catch(e){};if(window.__vcDotsObs)try{window.__vcDotsObs.disconnect()}catch(e){};if(window.__vcInt)clearInterval(window.__vcInt);if(window.__vcScanInt)clearInterval(window.__vcScanInt)"))
-                                    self._pending_clicker_reset = False
-
-                                # Batch all preamble state into a single CDP eval to reduce round trips (was 4 calls, now 1)
-                                scroll_paused_js = 'true' if self.scroll_paused else 'false'
-                                reset_js = 'window.__vcc=0;' if getattr(self, '_pending_reset', False) else ''
-                                if reset_js:
-                                    self._pending_reset = False
-                                preamble = (
-                                    f"window.__vchb=Date.now();"
-                                    f"{reset_js}"
-                                    f"window.__vcoverlay={'true' if self.overlay_on else 'false'};"
-                                    f"window.__vcHighlightOn={'true' if self.highlight_on else 'false'};"
-                                    f"window.__vcEnabled={json.dumps(self.enabled)};"
-                                    f"window.__vcScanDelay={self.scan_delay};"
-                                    f"window.__vcClickDelay={self.click_delay};"
-                                    f"window.__vcTypingDelay={self.typing_delay * 1000};"
-                                    f"window.__vcScrollDelay={self.scroll_delay * 1000};"
-                                    f"window.__vcCBClicks={self.cb_clicks};"
-                                    f"window.__vcCBSeconds={self.cb_seconds * 1000};"
-                                    f"window.__vcScrollPaused={scroll_paused_js}"
-                                )
-                                loop.run_until_complete(_cdp_eval(ws, preamble))
-
-                                res = loop.run_until_complete(_cdp_eval(ws, FINDER_JS))
-                                if res:
-                                    val = res.get('result',{}).get('result',{}).get('value','{}')
-                                    try: status = json.loads(val)
-                                    except Exception as parse_err:
-                                        debug_log(f"FINDER_JS parse error: {parse_err}, raw={val[:200]}")
-                                        status = {}
-                                    if isinstance(status, dict):
-                                        c = status.get('c', 0)
-                                        m = status.get('m', '')
-                                        inv = status.get('inv', 0)
-                                        cd = status.get('cd', 0)
-                                        dots = status.get('dots', False)
-                                        all_matched = status.get('all', 0)
-                                        max_cd = max(max_cd, cd)
-                                        
-                                        tel = status.get('tel', {})
+                            ws_url = p.get('webSocketDebuggerUrl')
+                            if not ws_url: continue
+                            
+                            if ws_url not in active_connections:
+                                try:
+                                    ws = await websockets.connect(ws_url, max_size=10_000_000, close_timeout=1)
+                                    await ws.send(json.dumps({"id": 1, "method": "DOM.enable"}))
+                                    await ws.send(json.dumps({"id": 2, "method": "Accessibility.enable"}))
+                                    
+                                    await ws.send(json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": "!!document.querySelector('.monaco-workbench')", "returnByValue": True}}))
+                                    is_ide = False
+                                    while True:
+                                        try:
+                                            resp = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                                            data = json.loads(resp)
+                                            if data.get("id") == 3:
+                                                is_ide = data.get("result", {}).get("result", {}).get("value", False)
+                                                break
+                                        except:
+                                            break
                                             
-                                        if c > 0: self.total_clicks = max(self.total_clicks, c)
-                                        if m and m != self.last_msg:
-                                            self.last_msg = m
-                                            debug_log(f"Scanner message: {m}")
-                                            # Clear message in JS so it's not re-consumed on next poll
-                                            loop.run_until_complete(_cdp_eval(ws, "window.__vcm=''"))
-                                            print(f"[CLICK] {m}")
-                                            if "[CIRCUIT BREAKER]" in m and getattr(self, 'active', False):
-                                                debug_log(f"CIRCUIT BREAKER triggered: {m}")
+                                    ide_flags[ws_url] = is_ide
+                                    active_connections[ws_url] = ws
+                                except Exception:
+                                    continue
+                                    
+                            ws = active_connections[ws_url]
+                            
+                            try:
+                                # Auto scroll
+                                if not self.scroll_paused:
+                                    await ws.send(json.dumps({"id": 5, "method": "Runtime.evaluate", "params": {"expression": auto_scroll_js}}))
+
+                                # Process agentic bridge queues
+                                while not command_queue.empty():
+                                    try:
+                                        cmd = command_queue.get_nowait()
+                                        if cmd['action'] == 'inject':
+                                            js = INJECT_JS % json.dumps(cmd['prompt'])
+                                            await ws.send(json.dumps({"id": 6, "method": "Runtime.evaluate", "params": {"expression": js}}))
+                                        elif cmd['action'] == 'read_dom':
+                                            await ws.send(json.dumps({"id": 7, "method": "Runtime.evaluate", "params": {"expression": READ_DOM_JS, "returnByValue": True}}))
+                                    except Exception: break
+
+                                # Get chat bounds to prevent clicking sidebar tasks
+                                bounds_js = """(function(){
+                                    var chat = document.querySelector('#conversation, .conversation, .chat-container, .chat, main, .antigravity-agent-side-panel');
+                                    if(!chat) return {l: 0, r: window.innerWidth * 0.75, t: 0, b: window.innerHeight};
+                                    var r = chat.getBoundingClientRect();
+                                    return {l: r.left - 20, r: r.right + 20, t: r.top - 20, b: r.bottom + 20}; // adding 20px padding
+                                })()"""
+                                await ws.send(json.dumps({"id": 99, "method": "Runtime.evaluate", "params": {"expression": bounds_js, "returnByValue": True}}))
+                                
+                                if getattr(self, 'switcher_on', False):
+                                    blue_dot_js = """(function(){
+                                        try {
+                                            var els = document.querySelectorAll('*');
+                                            var debug_log = "DEBUG: Found " + els.length + " els.\\n";
+                                            var checked = 0;
+                                            for(var i=0; i<els.length; i++) {
+                                                var el = els[i];
+                                                var cname = (el.className && typeof el.className === 'string') ? el.className.toLowerCase() : '';
+                                                var aria = (el.getAttribute('aria-label') || '').toLowerCase();
+                                                
+                                                if (el.tagName && el.tagName.toLowerCase() === 'circle') {
+                                                    var fill = window.getComputedStyle(el).fill || '';
+                                                    var fmatch = fill.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+                                                    if (fmatch && parseInt(fmatch[3]) > 120 && parseInt(fmatch[3]) > parseInt(fmatch[1])*1.2) {
+                                                        // It's a blue circle SVG
+                                                    } else { continue; }
+                                                } else {
+                                                    var isBadge = false;
+                                                    if (cname.includes('unread') || cname.includes('notification-badge') || aria.includes('unread') || aria.includes('attention')) {
+                                                        isBadge = true;
+                                                    }
+                                                    if (!isBadge) {
+                                                        var style = window.getComputedStyle(el);
+                                                        var after = window.getComputedStyle(el, '::after');
+                                                        var before = window.getComputedStyle(el, '::before');
+                                                        var styles = [style, after, before];
+                                                        for(var k=0; k<styles.length; k++) {
+                                                            if (!styles[k]) continue;
+                                                            var w = parseFloat(styles[k].width) || 0;
+                                                            var h = parseFloat(styles[k].height) || 0;
+                                                            if (w >= 4 && w <= 24 && h >= 4 && h <= 24) {
+                                                                var bg = styles[k].backgroundColor || '';
+                                                                var match = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+                                                                if (match && parseInt(match[3]) > 120 && parseInt(match[3]) > parseInt(match[1])*1.2) {
+                                                                    isBadge = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    if (!isBadge) continue;
+                                                }
+                                                
+                                                checked++;
+                                                debug_log += "\\nFound candidate: " + el.tagName + " " + cname + " " + aria + "\\nHTML: " + el.outerHTML.substring(0, 200) + "\\n";
+                                                
+                                                // Avoid clicking the toggle button itself if it's the ⇄ button
+                                                var parent = el.closest('button, a, [role="button"], [role="treeitem"], li, .monaco-list-row, .cursor-pointer');
+                                                if (parent && parent.innerText && parent.innerText.includes('⇄')) continue;
+                                                if (parent && parent.innerText && parent.innerText.includes('Antigravity')) continue; // Ignore chat header
+                                                if (el.closest('.antigravity-chat-header')) continue;
+                                                
+                                                var targetEl = el;
+                                                if (parent) targetEl = parent;
+                                                
+                                                var rRect = targetEl.getBoundingClientRect();
+                                                if (rRect.width === 0 || rRect.height === 0) continue;
+                                                var x = rRect.left + rRect.width/2;
+                                                var y = rRect.top + rRect.height/2;
+                                                
+                                                var down = new MouseEvent('mousedown', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                                var up = new MouseEvent('mouseup', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                                var click = new MouseEvent('click', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                                var pdown = new PointerEvent('pointerdown', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                                var pup = new PointerEvent('pointerup', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                                
+                                                targetEl.dispatchEvent(pdown);
+                                                targetEl.dispatchEvent(down);
+                                                targetEl.dispatchEvent(pup);
+                                                targetEl.dispatchEvent(up);
+                                                targetEl.dispatchEvent(click);
+                                                if(typeof targetEl.click === 'function') { targetEl.click(); }
+                                                
+                                                return {__clicked: targetEl.outerHTML, __dot: el.outerHTML};
+                                            }
+                                            return debug_log;
+                                        } catch (e) {
+                                            return "ERROR: " + e.message + "\\n" + e.stack;
+                                        }
+                                    })()"""
+                                    await ws.send(json.dumps({"id": 100, "method": "Runtime.evaluate", "params": {"expression": blue_dot_js, "returnByValue": True}}))
+
+                                # Get AX Tree
+                                await ws.send(json.dumps({"id": 3, "method": "Accessibility.getFullAXTree"}))
+                                nodes = []
+                                chat_bounds = None
+                                clicked_dot = False
+                                while True:
+                                    try:
+                                        resp = await asyncio.wait_for(ws.recv(), timeout=2.0)
+                                        data = json.loads(resp)
+                                        
+                                        if data.get("id") == 7:
+                                            val = data.get('result',{}).get('result',{}).get('value','')
+                                            for q_cmd in command_queue.queue:
+                                                if q_cmd.get('action') == 'read_dom':
+                                                    q_cmd['res_q'].put(val)
+                                                    
+                                        if data.get("id") == 99:
+                                            chat_bounds = data.get("result", {}).get("result", {}).get("value")
+                                            
+                                        if data.get("id") == 100:
+                                            res_val = data.get("result", {}).get("result", {}).get("value")
+                                            if isinstance(res_val, dict) and "__dump" in res_val:
+                                                import os
+                                                with open(os.path.join(os.path.dirname(__file__), "sidebar_debug.html"), "w", encoding="utf-8") as f:
+                                                    f.write(res_val["__dump"])
+                                            elif isinstance(res_val, dict) and "__clicked" in res_val:
+                                                import os
+                                                with open(os.path.join(os.path.dirname(__file__), "clicked_debug.html"), "w", encoding="utf-8") as f:
+                                                    f.write("CLICKED TARGET:\\n" + res_val["__clicked"] + "\\n\\nTHE DOT:\\n" + res_val["__dot"])
+                                                clicked_dot = True
+                                            elif isinstance(res_val, str) and (res_val.startswith("ERROR:") or res_val.startswith("DEBUG:")):
+                                                import os
+                                                with open(os.path.join(os.path.dirname(__file__), "clicked_debug.html"), "w", encoding="utf-8") as f:
+                                                    f.write(res_val)
+                                                clicked_dot = False
+                                            else:
+                                                clicked_dot = res_val
+                                            
+                                        if data.get("id") == 3:
+                                            nodes = data.get("result", {}).get("nodes", [])
+                                            break
+                                    except asyncio.TimeoutError:
+                                        break
+
+                                dots = False
+                                all_matched = 0
+                                actionable = []
+                                
+                                blocklist = ['delete','remove','uninstall','format','reset','sign out','log out','close','discard','reject','deny','dismiss','erase','drop','run and debug','go back','go forward','more actions','always run','running','runner','run extension','run_cli','rescue run','rescue','allowlist','restart','reload','rules','mcp','feedback','star','scheduled tasks', '.md', '.py', '.js', '.json', '.html']
+                                
+                                if not hasattr(self, 'processed_nodes'):
+                                    self.processed_nodes = set()
+                                    
+                                current_number = None
+                                nodes_since_number = 0
+                                    
+                                for node in nodes:
+                                    role = node.get("role", {}).get("value")
+                                    name = node.get("name", {}).get("value", "")
+                                    node_id = node.get("backendDOMNodeId")
+                                    
+                                    is_ide = ide_flags.get(ws_url, False)
+                                    allowed_roles = ["StaticText", "button", "link", "ListMarker", "InlineTextBox", "radio", "option", "menuitem", "menuitemradio", "checkbox", "switch"] if is_ide else ["button", "link", "radio", "option", "menuitem", "menuitemradio", "checkbox", "switch"]
+                                    if name and role in allowed_roles:
+                                        name_lower = name.lower().strip()
+                                        
+                                        if name_lower in ['stop generating']:
+                                            dots = True
+                                        
+                                        if any(b == name_lower for b in blocklist) or any(b in name_lower for b in ['.md', '.py', '.json', 'scheduled tasks', 'background tasks', 'voice', 'record', 'mic', 'audio', 'start', 'stop']):
+                                            continue
+                                            
+                                        kw_match = None
+                                        for (k_kw, _, _, _, ctx) in KEYWORDS:
+                                            # Extra exact matching for subagent and return to avoid false positives
+                                            if k_kw in ['needs attention', 'go back', 'switch project', 'switch workspace'] and name_lower != k_kw and not name_lower.endswith(k_kw):
+                                                continue
+                                                
+                                            if k_kw in ['switch project', 'switch workspace'] and not getattr(self, 'switcher_on', False):
+                                                continue
+                                                
+                                            if name_lower == k_kw or re.search(r'\b' + re.escape(k_kw) + r'\b', name_lower):
+                                                if ctx == 'ide' and not is_ide:
+                                                    continue
+                                                kw_match = k_kw
+                                                break
+                                                
+                                        if 'submit' in name_lower:
+                                            kw_match = 'submit'
+                                            
+                                        if kw_match and (kw_match == 'submit' or self.enabled.get(kw_match, True)):
+                                            if hasattr(self, 'processed_nodes') and node_id in self.processed_nodes:
+                                                continue
+                                                
+                                            if kw_match == 'allow' and hasattr(self, 'pref_allow'):
+                                                clean_name = re.sub(r'^[\[\]\(\)\s\d\.]+', '', name_lower).strip()
+                                                if clean_name != 'allow' and self.pref_allow.lower() not in name_lower:
+                                                    continue
+                                                    
+                                            actionable.append({"name": name, "id": node_id, "kw": kw_match})
+                                            if kw_match != 'submit':
+                                                all_matched += 1
+                                                
+                                # Add logic to prevent clicking "go back" unless we recently approved something
+                                if not hasattr(self, 'return_pending'):
+                                    self.return_pending = 0
+                                    
+                                has_actions = any(t['kw'] in ['allow', 'always allow', 'allow forever', 'approve', 'yes', 'ok'] for t in actionable)
+                                if has_actions and not is_ide:
+                                    self.return_pending = time.time()
+                                    
+                                # Remove 'go back' if we don't have a pending return (within last 10 seconds), or if there are still actions to take
+                                if any(t['kw'] == 'go back' for t in actionable):
+                                    if time.time() - self.return_pending > 10 or has_actions:
+                                        actionable = [t for t in actionable if t['kw'] != 'go back']
+                                    else:
+                                        # Once we click 'go back', we clear the flag
+                                        self.return_pending = 0
+
+                                if dots:
+                                    if hasattr(self, 'processed_nodes'):
+                                        self.processed_nodes.clear()
+                                        
+                                if not actionable:
+                                    # DO NOT reset total_clicks here, it ruins the stats
+                                    if hasattr(self, 'processed_nodes'):
+                                        self.processed_nodes.clear()
+
+                                if actionable:
+                                    def rank(t):
+                                        if t['kw'] == 'submit': return 1
+                                        
+                                        # Advanced allow preference handling for radio buttons
+                                        if t['kw'] in ('allow', 'always allow', 'allow forever'):
+                                            name = t['name'].lower()
+                                            
+                                            is_workspace = 'project' in name or 'workspace' in name
+                                            is_every_time = ('always' in name or 'forever' in name or 'permanently' in name) and not is_workspace
+                                            is_once = not is_workspace and not is_every_time
+                                            
+                                            pref = getattr(self, 'pref_allow', '').lower()
+                                            
+                                            if pref == 'allow in workspace' and is_workspace: return 2
+                                            if pref == 'allow every time' and is_every_time: return 2
+                                            if pref == 'allow once' and is_once: return 2
+                                            
+                                            return -1
+                                            
+                                        if t['kw'] == 'accept all': return 2
+                                        return 0
+                                    actionable.sort(key=rank, reverse=True)
+                                    for target in actionable:
+                                        if hasattr(self, 'processed_nodes'):
+                                            if target["id"] in self.processed_nodes:
+                                                continue
+                                            self.processed_nodes.add(target["id"])
+                                        await ws.send(json.dumps({
+                                            "id": 104,
+                                            "method": "DOM.resolveNode",
+                                            "params": {"backendNodeId": target["id"]}
+                                        }))
+                                        
+                                        obj_id = None
+                                        while True:
+                                            try:
+                                                res_resp = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                                                res_data = json.loads(res_resp)
+                                                if res_data.get("id") == 104:
+                                                    obj_id = res_data.get("result", {}).get("object", {}).get("objectId")
+                                                    break
+                                            except asyncio.TimeoutError:
+                                                break
+                                                
+                                        if not obj_id:
+                                            continue
+                                            
+                                        js_click = """function() {
+                                            var node = this.nodeType === 3 ? this.parentElement : this;
+                                            var isSubagent = ('__KW__' === 'needs attention');
+                                            if (!node.getBoundingClientRect) return {s: "hidden"};
+                                            var r = node.getBoundingClientRect();
+                                            if (r.width === 0 && r.height === 0) return {s: "hidden"};
+                                            if (!isSubagent && node.closest('.left-sidebar, aside, .sidebar, .part.sidebar')) return {s: "sidebar"};
+                                            if (!isSubagent && node.closest('.chat-input, .composer, .input-area, .bottom-bar, [data-testid="composer"], form')) return {s: "composer"};
+                                            node.scrollIntoView({block: 'center'});
+                                            var r2 = node.getBoundingClientRect();
+                                            var x = r2.left + r2.width/2;
+                                            var y = r2.top + r2.height/2;
+                                            
+                                            // Dispatch full mouse event sequence for React/custom UI elements
+                                            var down = new MouseEvent('mousedown', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                            var up = new MouseEvent('mouseup', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                            var click = new MouseEvent('click', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
+                                            
+                                            node.dispatchEvent(down);
+                                            node.dispatchEvent(up);
+                                            node.dispatchEvent(click);
+                                            if(typeof node.click === 'function') { node.click(); }
+                                            
+                                            return {s: "clicked", x: x, y: y};
+                                        }""".replace('__KW__', target['kw'])
+                                        
+                                        await ws.send(json.dumps({
+                                            "id": 105,
+                                            "method": "Runtime.callFunctionOn",
+                                            "params": {
+                                                "objectId": obj_id,
+                                                "functionDeclaration": js_click,
+                                                "returnByValue": True
+                                            }
+                                        }))
+                                        
+                                        click_res = None
+                                        while True:
+                                            try:
+                                                click_resp = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                                                click_data = json.loads(click_resp)
+                                                if click_data.get("id") == 105:
+                                                    click_res = click_data.get("result", {}).get("result", {}).get("value")
+                                                    
+                                                    if target['kw'] in COUNTABLE_ACTIONS:
+                                                        self.total_clicks += 1
+                                                        if self.cb_clicks > 0 and self.total_clicks >= self.cb_clicks:
+                                                            # Tripped circuit breaker
+                                                            self.total_clicks = 0
+                                                            
+                                                            def trigger_cb():
+                                                                self.toggle_play(force=False)
+                                                                if self.tray_icon and getattr(self, 'play_active', False):
+                                                                    self.tray_icon.notify(f"Paused after {self.cb_clicks} clicks", "VegaClick Auto-Pause")
+                                                                    self.icon_state = "paused"
+                                                                    self.update_tray_icon()
+                                                            self.master.after(0, trigger_cb)
+                                                            debug_log(f"Circuit breaker tripped after {self.cb_clicks} clicks")
+                                                    
+                                                    is_submit = (target['kw'] == 'submit')
+                                                    if is_submit:
+                                                        self.master.after(0, lambda: self.master.event_generate("<<ClickSubmit>>"))
+                                                        
+                                                    break
+                                            except Exception as e:
+                                                break
+                                                
+                                        if not click_res or click_res.get("s") != "clicked":
+                                            self.last_msg = f"Ignored {target['kw']} ({click_res.get('s') if click_res else 'timeout'})"
+                                            self.root.after(0, lambda msg=self.last_msg: self.add_log(msg))
+                                            continue
+                                            
+                                        x, y = click_res.get("x", 0), click_res.get("y", 0)
+                                        
+                                        # Removed Input.dispatchMouseEvent to prevent clicking sticky footers over the target
+                                        
+                                        self.last_msg = f"Clicked {target['kw']} ({target['name'][:15]})"
+                                        
+                                        # Circuit breaker log
+                                        if target['kw'] == 'retry':
+                                            cbWindow = self.cb_seconds * 1000
+                                            now = time.time() * 1000
+                                            if not hasattr(self, '_vcClickLog'): self._vcClickLog = []
+                                            self._vcClickLog = [cx for cx in self._vcClickLog if now - cx['t'] < cbWindow]
+                                            self._vcClickLog.append({'k': 'retry', 't': now})
+                                            if len(self._vcClickLog) >= self.cb_clicks:
+                                                self.last_msg = "[CIRCUIT BREAKER] Loop detected on retry"
+                                                self._vcClickLog = []
                                                 self.root.after(0, self.toggle_play)
                                                 self.status_text = "PAUSED (Loop Limit)"
                                                 self.status_color = "#ef4444"
-                                            self.root.after(0, self.flash_click)
-                                            self.root.after(0, lambda msg=m: self.add_log(msg))
+                                                
+                                        self.root.after(0, self.flash_click)
+                                        self.root.after(0, lambda msg=self.last_msg: self.add_log(msg))
+                                        
+                                        if self.overlay_on:
+                                            ripple_js = f"""
+                                            (function(){{
+                                                var dot = document.createElement('div');
+                                                dot.style.cssText = 'position:fixed;pointer-events:none;z-index:999999;border-radius:50%;left:{x-16}px;top:{y-16}px;width:32px;height:32px;border:3px solid rgba(168,85,247,0.9);background:rgba(168,85,247,0.3);transition:transform 0.5s ease-out, opacity 0.5s ease-out;transform:scale(0.5);opacity:1';
+                                                document.body.appendChild(dot);
+                                                requestAnimationFrame(function() {{ dot.style.transform = 'scale(2.5)'; dot.style.opacity = '0'; }});
+                                                setTimeout(function() {{ dot.remove() }}, 600);
+                                            }})()
+                                            """
+                                            await ws.send(json.dumps({"id": 5, "method": "Runtime.evaluate", "params": {"expression": ripple_js}}))
+                                        
+                                        break
+                                                
+                                    max_cd = self.click_delay
+                                    await asyncio.sleep(self.click_delay / 1000.0)
 
+                                if dots: a_count += 1
+                                elif all_matched > 0: w_count += 1
+                                else: c_count += 1
+                                
+                            except websockets.exceptions.ConnectionClosed:
+                                del active_connections[ws_url]
+                            except Exception:
+                                pass
 
-                                        self.scan_targets = inv
-                                        # Log per-page state for deep debugging
-                                        page_state = 'Active(dots)' if dots else f'Waiting({all_matched}matches)' if all_matched > 0 else 'Idle'
-                                        debug_log(f"Page '{p.get('title','?')[:30]}': state={page_state} clicks={c} inv={inv} cd={cd}ms")
-                                        # Classify page state
-                                        if dots:
-                                            a_count += 1
-                                        elif all_matched > 0:
-                                            w_count += 1
-                                        else:
-                                            c_count += 1
-                            except Exception as page_err:
-                                debug_log(f"Page processing error: {page_err}")
-
-                            while not command_queue.empty():
-                                try:
-                                    cmd = command_queue.get_nowait()
-                                    if cmd['action'] == 'inject':
-                                        js = INJECT_JS % json.dumps(cmd['prompt'])
-                                        loop.run_until_complete(_cdp_eval(ws, js))
-                                    elif cmd['action'] == 'read_dom':
-                                        res = loop.run_until_complete(_cdp_eval(ws, READ_DOM_JS))
-                                        val = res.get('result',{}).get('result',{}).get('value','') if res else ''
-                                        cmd['res_q'].put(val)
-                                except queue.Empty: break
                         self.cooldown = max_cd
-                        # Store page states for colored rendering
                         self._pages_total = len(pages)
-                        old_states = getattr(self, '_page_states', (0,0,0))
                         self._page_states = (a_count, w_count, c_count)
-                        if old_states != self._page_states:
-                            debug_log(f"State change: A={a_count} W={w_count} I={c_count} (was A={old_states[0]} W={old_states[1]} I={old_states[2]}) cooldown={max_cd}ms total_clicks={self.total_clicks}")
-
-                        # Idle alert: if any page is busy (active or waiting), reset timer
+                        
                         if a_count > 0 or w_count > 0:
                             self._last_busy_time = time.time()
                             self._idle_alerted = False
@@ -1653,47 +2077,16 @@ class VegaClickApp:
                             idle_seconds = time.time() - self._last_busy_time
                             if idle_seconds >= self.idle_alert_minutes * 60:
                                 self._idle_alerted = True
-                                debug_log(f"Idle alert firing after {idle_seconds:.0f}s")
                                 self.root.after(0, self._play_idle_alert)
-                                self.root.after(0, lambda: self.add_log(f'Idle alert — agent idle for {self.idle_alert_minutes}min'))
-                        self.status_text = 'states'  # Signal to refresh_ui to use _page_states
+                                self.root.after(0, lambda: self.add_log(f'Idle alert - agent idle for {self.idle_alert_minutes}min'))
+                        self.status_text = 'states'
                     else:
                         self.status_text = "Inactive"
                         self.status_color = "#64748b"
-                        a_count = 0; w_count = 0; c_count = 0
-                        for p in pages:
-                            ws = p.get('webSocketDebuggerUrl')
-                            if not ws: continue
-                            try:
-                                disable_js = "if(window.__vcObs)try{window.__vcObs.disconnect()}catch(e){};if(window.__vcDotsObs)try{window.__vcDotsObs.disconnect()}catch(e){};if(window.__vcInt)clearInterval(window.__vcInt);if(window.__vcScanInt)clearInterval(window.__vcScanInt);if(window.__vcThr)clearTimeout(window.__vcThr);window.__vcScrollPaused=true;window.__vc=false;if(window.__vcKD)document.removeEventListener('keydown',window.__vcKD,true);if(window.__vcWH)document.removeEventListener('wheel',window.__vcWH,true);if(window.__vcTM)document.removeEventListener('touchmove',window.__vcTM,true);"
-                                loop.run_until_complete(_cdp_eval(ws, disable_js))
-                                
-                                # Lightweight state probe — detect Stop button (Active) or action buttons (Waiting)
-                                probe_js = "(function(){var btns=document.querySelectorAll('button,[role=button],[tabindex]');var hasStop=false,hasAction=false;for(var i=0;i<btns.length;i++){var t=(btns[i].textContent||'').trim().toLowerCase();var r=btns[i].getBoundingClientRect();if(r.width<1||r.height<1)continue;if(t==='stop'||t==='stop generating'||t==='cancel')hasStop=true;if(t==='accept all'||t==='accept'||t==='allow'||t==='allow all'||t==='allow in workspace'||t==='allow in this conversation'||t==='allow this conversation'||t==='run'||t==='run command'||t==='run task'||t==='approve'||t==='continue'||t==='proceed'||t==='retry'||t==='try again'||t==='trust'||t==='ok'||t==='okay'||t==='yes'||t==='confirm'||t==='apply'||t==='apply all'||t==='send all')hasAction=true;}return hasStop?'A':hasAction?'W':'C';})()"
-                                res = loop.run_until_complete(_cdp_eval(ws, probe_js))
-                                state = res.get('result', {}).get('result', {}).get('value', 'C') if res else 'C'
-                                if state == 'A': a_count += 1
-                                elif state == 'W': w_count += 1
-                                else: c_count += 1
-                            except: pass
-
-                            # Still process command queue when inactive
-                            while not command_queue.empty():
-                                try:
-                                    cmd = command_queue.get_nowait()
-                                    if cmd['action'] == 'inject':
-                                        js = INJECT_JS % json.dumps(cmd['prompt'])
-                                        loop.run_until_complete(_cdp_eval(ws, js))
-                                    elif cmd['action'] == 'read_dom':
-                                        res = loop.run_until_complete(_cdp_eval(ws, READ_DOM_JS))
-                                        val = res.get('result',{}).get('result',{}).get('value','') if res else ''
-                                        cmd['res_q'].put(val)
-                                except queue.Empty: break
-                        self._pages_total = len(pages)
-                        self._page_states = (a_count, w_count, c_count)
-            except Exception as loop_err:
-                debug_log(f"Worker loop exception: {loop_err}")
-            time.sleep(POLL_INTERVAL)
+            except Exception:
+                pass
+                
+            await asyncio.sleep(POLL_INTERVAL)
 
     def run(self):
         debug_log("Entering Tk mainloop")

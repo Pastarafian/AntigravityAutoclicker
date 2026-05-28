@@ -1,0 +1,142 @@
+[
+  {
+    "text": "run",
+    "tag": "DIV",
+    "cls": "menubar-menu-button",
+    "parentClasses": [
+      "menubar-menu-button",
+      "menubar inactive",
+      "titlebar-left",
+      "titlebar-container has-center",
+      "part titlebar cascade-panel-open inactive",
+      "split-view-view visible",
+      "split-view-container",
+      "monaco-scrollable-element "
+    ],
+    "parentTags": [
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV"
+    ],
+    "rect": {
+      "x": 252.4250030517578,
+      "y": 0,
+      "width": 38.51250076293945,
+      "height": 34.20000076293945,
+      "top": 0,
+      "right": 290.93750381469727,
+      "bottom": 34.20000076293945,
+      "left": 252.4250030517578
+    }
+  },
+  {
+    "text": "run",
+    "tag": "DIV",
+    "cls": "menubar-menu-title",
+    "parentClasses": [
+      "menubar-menu-title",
+      "menubar-menu-button",
+      "menubar inactive",
+      "titlebar-left",
+      "titlebar-container has-center",
+      "part titlebar cascade-panel-open inactive",
+      "split-view-view visible",
+      "split-view-container"
+    ],
+    "parentTags": [
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV"
+    ],
+    "rect": {
+      "x": 252.4250030517578,
+      "y": 6.099999904632568,
+      "width": 38.51250076293945,
+      "height": 22,
+      "top": 6.099999904632568,
+      "right": 290.93750381469727,
+      "bottom": 28.09999990463257,
+      "left": 252.4250030517578
+    }
+  },
+  {
+    "text": "continue",
+    "tag": "SPAN",
+    "cls": "mtk18",
+    "parentClasses": [
+      "mtk18",
+      "",
+      "view-line",
+      "view-lines monaco-mouse-cursor-text",
+      "lines-content monaco-editor-background",
+      "monaco-scrollable-element editor-scrollable vs-dark",
+      "overflow-guard",
+      "monaco-editor no-user-select  showUnused showDeprecated vs-dark"
+    ],
+    "parentTags": [
+      "SPAN",
+      "SPAN",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV"
+    ],
+    "rect": {
+      "x": 587.5875244140625,
+      "y": 192.8000030517578,
+      "width": 61.587501525878906,
+      "height": 16,
+      "top": 192.8000030517578,
+      "right": 649.1750259399414,
+      "bottom": 208.8000030517578,
+      "left": 587.5875244140625
+    }
+  },
+  {
+    "text": "continue",
+    "tag": "SPAN",
+    "cls": "mtk18",
+    "parentClasses": [
+      "mtk18",
+      "",
+      "view-line",
+      "view-lines monaco-mouse-cursor-text",
+      "lines-content monaco-editor-background",
+      "monaco-scrollable-element editor-scrollable vs-dark",
+      "overflow-guard",
+      "monaco-editor no-user-select  showUnused showDeprecated vs-dark"
+    ],
+    "parentTags": [
+      "SPAN",
+      "SPAN",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV",
+      "DIV"
+    ],
+    "rect": {
+      "x": 572.1749877929688,
+      "y": 249.8000030517578,
+      "width": 61.587501525878906,
+      "height": 16,
+      "top": 249.8000030517578,
+      "right": 633.7624893188477,
+      "bottom": 265.8000030517578,
+      "left": 572.1749877929688
+    }
+  }
+]

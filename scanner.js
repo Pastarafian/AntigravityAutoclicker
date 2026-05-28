@@ -93,7 +93,7 @@
   // Detects the animated ellipsis (. / .. / ...) in chat to determine if the agent is thinking
   function detectAgentDots() {
     try {
-      var panels = document.querySelectorAll('[class*="antigravity-agent-side-panel"], #conversation, [class*="agent-convo-background"], [class*="ide-chat-background"]');
+      var panels = document.querySelectorAll('[class*="antigravity-agent-side-panel"], #conversation, [class*="agent-convo-background"], [class*="ide-chat-background"], [id*="agentSidePanel"]');
       for(var p = 0; p < panels.length; p++) {
         var panel = panels[p];
 
@@ -241,6 +241,7 @@
           }
 
           var t = raw.split(/\r?\n/)[0].trim().toLowerCase();
+          t = t.replace(/^[0-9\.\)\(\]\[]+\s*/, '');
           
           // --- TELEMETRY CAPTURE (while scanning text) ---
           if (t.length > 5 && t.length < 50) {
@@ -333,6 +334,7 @@
             var cid = (cp.id||'').toLowerCase();
             if(ccls.indexOf('antigravity-agent-side-panel') >= 0 ||
                cid === 'conversation' ||
+               cid.indexOf('agentsidepanel') >= 0 ||
                ccls.indexOf('agent-convo-background') >= 0 ||
                ccls.indexOf('ide-chat-background') >= 0 ||
                (cid === 'workbench.parts.auxiliarybar' && ccls.indexOf('right') >= 0)) {
@@ -426,8 +428,7 @@
             { kw='approve'; priority=80; }
           else if(t === 'continue' || t === 'proceed')
             { kw='continue'; priority=75; }
-          else if(t === 'run' || t === 'run command' || t === 'run task')
-            { kw='run'; priority=70; }
+
           else if(t === 'retry' || t === 'try again')
             { kw='retry'; priority=65; }
           else if(t === 'ok' || t === 'okay')
@@ -489,7 +490,7 @@
 
     // Scope walk to known chat panel containers first, fall back to full document
     var panels = document.querySelectorAll(
-      '.antigravity-agent-side-panel, #conversation, [class*="agent-convo-background"], [class*="ide-chat-background"]'
+      '.antigravity-agent-side-panel, #conversation, [class*="agent-convo-background"], [class*="ide-chat-background"], [id*="agentSidePanel"]'
     );
     if(panels.length > 0) {
       for(var pi=0; pi<panels.length; pi++) walk(panels[pi], 0);
@@ -542,25 +543,6 @@
         if(cs.display === 'none' || cs.visibility === 'hidden') continue;
       } catch(ex){}
 
-      // Danger check for 'run'
-      if(t.kw === 'run') {
-        var danger = false, p = e;
-        for(var j=0; j<4 && p; j++){
-          try {
-            var cd = p.querySelector('code,pre');
-            if(cd){
-              var cdt = (cd.textContent||'');
-              for(var di=0; di<BCMD.length; di++){
-                if(cdt.indexOf(BCMD[di])>=0){ danger=true; break; }
-              }
-            }
-          } catch(ex){}
-          if(danger) break;
-          p = p.parentElement || (p.parentNode && p.parentNode.host);
-        }
-        if(danger) continue;
-      }
-
       // Dedup check
       var hash = t.kw + '|' + Math.round(r.left/20) + '|' + Math.round(r.top/20);
       var lastClick = window.__vcClicked[hash];
@@ -581,7 +563,7 @@
     }
 
     var colors = {
-      'run':'59,130,246','accept all':'34,197,94','accept':'34,197,94',
+      'accept all':'34,197,94','accept':'34,197,94',
       'allow':'34,197,94','trust':'34,197,94','continue':'34,197,94',
       'retry':'234,179,8','approve':'99,102,241','send all':'59,130,246','changes overview':'168,85,247'
     };

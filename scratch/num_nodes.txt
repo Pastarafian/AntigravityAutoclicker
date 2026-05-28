@@ -1,0 +1,344 @@
+Role: StaticText, Name: 16h
+Role: StaticText, Name: 3d
+Role: StaticText, Name: 2d
+Role: StaticText, Name: 2d
+Role: StaticText, Name: 8d
+Role: StaticText, Name: 8d
+Role: StaticText, Name: 8d
+Role: StaticText, Name: 9d
+Role: InlineTextBox, Name: 16h
+Role: StaticText, Name: 9d
+Role: StaticText, Name: 2d
+Role: StaticText, Name: 2d
+Role: StaticText, Name: 3d
+Role: InlineTextBox, Name: 3d
+Role: StaticText, Name: 3d
+Role: InlineTextBox, Name: 2d
+Role: InlineTextBox, Name: 2d
+Role: InlineTextBox, Name: 8d
+Role: InlineTextBox, Name: 8d
+Role: InlineTextBox, Name: 8d
+Role: InlineTextBox, Name: 9d
+Role: StaticText, Name: 6:41
+Role: StaticText, Name: 6:44
+Role: StaticText, Name: 9d
+Role: InlineTextBox, Name: 9d
+Role: InlineTextBox, Name: 2d
+Role: InlineTextBox, Name: 2d
+Role: InlineTextBox, Name: 3d
+Role: InlineTextBox, Name: 3d
+Role: InlineTextBox, Name: 6:41
+Role: StaticText, Name: 1 file changed
+Role: StaticText, Name: 41
+Role: StaticText, Name: 79
+Role: InlineTextBox, Name: 6:44
+Role: InlineTextBox, Name: 9d
+Role: ListMarker, Name: 1. 
+Role: ListMarker, Name: 2. 
+Role: ListMarker, Name: 3. 
+Role: ListMarker, Name: 4. 
+Role: InlineTextBox, Name: 1 file changed
+Role: InlineTextBox, Name: 41
+Role: InlineTextBox, Name: 79
+Role: StaticText, Name: 6:44
+Role: StaticText, Name: 7:10
+Role: StaticText, Name: 9
+Role: StaticText, Name: 5
+Role: InlineTextBox, Name: 6:44
+Role: InlineTextBox, Name: 7:10
+Role: StaticText, Name: 1 file
+Role: StaticText, Name: 1655:                                chat_bounds = None
+1668:                                            chat_bounds = data.get("result", {}).get("result", {}).get("value")
+
+Role: StaticText, Name: 1 file
+Role: StaticText, Name: [2026-05-27 07:02:49] ============================================================
+[2026-05-27 07:02:49] VegaClick v16 starting �?" PID=10520 Python=3.13.5 Platform=win32
+[2026-05-27 07:02:49] Script path: C:\Users\fakej\Documents\VegaClick\vegaclick.py
+[2026-05-27 07:02:49] Log file: C:\Users\fakej\Documents\VegaClick\debug_logs\2026-05-27_vegaclick-debug\debug.log
+[2026-05-27 07:02:49] ============================================================
+[2026-05-27 07:02:49] cleanup_old_processes: starting (my_pid=10520)
+[2026-05-27 07:02:49] cleanup_old_processes: killed 0 (psutil path)
+[2026-05-27 07:02:49] Socket lock acquired on 127.0.0.1:9842
+[2026-05-27 07:02:49] Constructing VegaClickApp...
+[2026-05-27 07:02:49] Initializing VegaClickApp...
+[2026-05-27 07:02:49] Loading settings from disk...
+[2026-05-27 07:02:49] Settings loaded: preset=All scan=25ms click=50ms typing=5s scroll=15s cb=3/20s idle=5min autostart=True pref_allow=allow in workspace enabled_kw=15/15 pill=(969,796)
+[2026-05-27 07:02:49] UI pill geometry: 530x30 at (969,796), screen=(1536x864)
+[2026-05-27 07:02:49] Worker loop starting
+[2026-05-27 07:02:49] Worker thread started
+[2026-05-27 07:02:49] Quota thread started
+[2026-05-27 07:02:49] Global hotkey registered
+[2026-05-27 07:02:49] Agentic bridge thread spawned
+[2026-05-27 07:02:49] Init complete �?" UI refresh loop started
+[2026-05-27 07:02:49] Entering Tk mainloop
+[2026-05-27 07:02:50] Agentic Bridge starting on 127.0.0.1:4242
+[2026-05-27 07:02:54] Pill dragged: (969,796) -> (874,844)
+[2026-05-27 07:02:54] _save_all: preset=All scan=25 click=50 typing=5 scroll=15 cb=3/20 idle=5min
+[2026-05-27 07:02:54] Settings saved: preset=All scan=25ms click=50ms pill=(874,844)
+[2026-05-27 07:02:55] toggle_play: active set to True
+[2026-05-27 07:03:02] toggle_scroll: from False to True
+
+Role: InlineTextBox, Name: 9
+Role: InlineTextBox, Name: 5
+Role: StaticText, Name: 52514
+/devtools/browser/ec1fe976-944a-4956-9231-1f167d275167
+
+Role: StaticText, Name: 1 file
+Role: StaticText, Name: 33:def debug_log(msg):
+85:    def __init__(self, widget, text):
+91:    def show(self, e=None):
+106:    def hide(self, e=None):
+112:    def __init__(self, parent, text, color='#a78bfa', duration=3500, on_click=None):
+144:    def _handle_click(self, e):
+149:    def fade_in(self, alpha=0.0):
+158:    def fade_out(self, alpha=0.95):
+167:def load_settings():
+190:        debug_log(f"Settings load FAILED ({e}), using defaults")
+193:def save_settings(enabled, scan_delay=100, click_delay=150, preset='All', typing_delay=5, scroll_delay=15,
+248:def start_agentic_bridge():
+251:        def log_message(self, format, *args): pass
+252:        def do_POST(self):
+270:        def do_GET(self):
+298:def cleanup_old_processes():
+392:async def get_targets_async():
+394:    async def probe(port):
+422:async def _cdp_eval(ws_url, js_code):
+439:    def __init__(self):
+474:        # Use saved position if available, otherwise default to bottom-right
+495:        self.ui_status.tag_configure('default', foreground='#e6edf3')
+577:    def _fetch_quota_worker(self):
+579:        ctx = ssl.create_default_context()
+627:                                    model_color = 'default'
+693:    def _start_drag(self, e):
+699:    def _on_drag(self, e):
+706:    def _end_drag(self, e):
+716:    def on_close(self):
+721:        def _force_exit():
+728:    def prompt_restart(self):
+742:    def restart_clicker(self):
+781:    def show_toast(self, text, color='#a78bfa', on_click=None):
+785:    def focus_ide(self):
+796:            def enum_cb(hwnd, lparam):
+815:    def restart_antigravity(self):
+914:    def toggle_overlay(self):
+919:    def toggle_highlight(self):
+924:    def toggle_scroll(self):
+934:    def toggle_play(self):
+947:    def _save_all(self):
+956:    def _register_global_hotkey(self):
+960:        def _hotkey_listener():
+987:    def _play_idle_alert(self):
+990:        def _beep():
+1003:    def toggle_auto_start(self):
+1046:    def toggle_settings(self):
+1052:    def close_drawer(self):
+1062:    def open_drawer(self):
+1298:    def toggle_pref_allow(self):
+1309:    def _save_delays(self):
+1341:    def click_toggle(self, kw):
+1351:    def flash_click(self):
+1354:    def restart_ide(self):
+1355:        def _bg():
+1379:    def reset_clicks(self):
+1383:    def open_log_window(self):
+1407:    def add_log(self, msg):
+1420:    def _append_log_text(self, text):
+1429:    def open_preset_dropdown(self):
+1457:    def close_preset_popup(self):
+1466:    def apply_preset(self, name):
+1481:    def refresh_ui(self):
+1551:    def worker_loop(self):
+1559:    async def async_worker_loop(self):
+1585:                targets = await get_targets_async()
+1732:                                    def rank(t):
+1870:    def run(self):
+1902:    def __global_exception_handler(exctype, value, tb):
+
+Role: StaticText, Name: 1 file
+Role: InlineTextBox, Name: 4);g=tsd(c);g.b==0?Ixd(c,cld,null):Ixd(c,cld,g)}}}if(!Heb(TD(Gxd(a,(vn
+Role: InlineTextBox, Name: 137,{3:1,423:1,385:1,96:1,137:1},dtd,etd);_.cg=function htd(b){var c,
+Role: InlineTextBox, Name: -9999px;\n          width: 1px;\n          height: 1px;\n          ove
+Role: InlineTextBox, Name: 7;\n        }\n\n        .xterm-decoration-overview-ruler {\n
+Role: InlineTextBox, Name: 0%;\n          width: 3px;\n          box-shadow: var(--vscode-scrollb
+Role: InlineTextBox, Name: 1 file
+Role: InlineTextBox, Name: 1655:                                chat_bounds = None
+Role: InlineTextBox, Name: 1668:                                            chat_bounds = data.get
+Role: InlineTextBox, Name: 1 file
+Role: InlineTextBox, Name: \2026-05-27_vegaclick-debug\debug.log -Tail 50
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] ================================================
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] VegaClick v16 starting �?" PID=10520 Python=3.1
+Role: InlineTextBox, Name: 3.5 Platform=win32
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Script path: C:\Users\fakej\Documents\VegaClick
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Log file: C:\Users\fakej\Documents\VegaClick\deb
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] ================================================
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] cleanup_old_processes: starting (my_pid=10520)
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] cleanup_old_processes: killed 0 (psutil path)
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Socket lock acquired on 127.0.0.1:9842
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Constructing VegaClickApp...
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Initializing VegaClickApp...
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Loading settings from disk...
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Settings loaded: preset=All scan=25ms click=50ms
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] UI pill geometry: 530x30 at (969,796), screen=(1
+Role: InlineTextBox, Name: 536x864)
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Worker loop starting
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Worker thread started
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Quota thread started
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Global hotkey registered
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Agentic bridge thread spawned
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Init complete �?" UI refresh loop started
+Role: InlineTextBox, Name: [2026-05-27 07:02:49] Entering Tk mainloop
+Role: InlineTextBox, Name: [2026-05-27 07:02:50] Agentic Bridge starting on 127.0.0.1:4242
+Role: InlineTextBox, Name: [2026-05-27 07:02:54] Pill dragged: (969,796) -> (874,844)
+Role: InlineTextBox, Name: [2026-05-27 07:02:54] _save_all: preset=All scan=25 click=50 typing=5
+Role: InlineTextBox, Name: [2026-05-27 07:02:54] Settings saved: preset=All scan=25ms click=50ms
+Role: InlineTextBox, Name: [2026-05-27 07:02:55] toggle_play: active set to True
+Role: InlineTextBox, Name: [2026-05-27 07:03:02] toggle_scroll: from False to True
+Role: InlineTextBox, Name: -8')); print([p['url'] for p in pages])"
+Role: InlineTextBox, Name: f-8')); print([p['url'] for p in pages])"
+Role: InlineTextBox, Name: -8')); print([p.get('webSocketDebuggerUrl') for p in pages])"
+Role: InlineTextBox, Name: 0.0
+Role: InlineTextBox, Name: 52514
+Role: InlineTextBox, Name: 1 file
+Role: InlineTextBox, Name: 33:def debug_log(msg):
+Role: InlineTextBox, Name: 85:    def __init__(self, widget, text):
+Role: InlineTextBox, Name: 91:    def show(self, e=None):
+Role: InlineTextBox, Name: 106:    def hide(self, e=None):
+Role: InlineTextBox, Name: 112:    def __init__(self, parent, text, color='#a78bfa', duration=350
+Role: InlineTextBox, Name: 0, on_click=None):
+Role: InlineTextBox, Name: 144:    def _handle_click(self, e):
+Role: InlineTextBox, Name: 149:    def fade_in(self, alpha=0.0):
+Role: InlineTextBox, Name: 158:    def fade_out(self, alpha=0.95):
+Role: InlineTextBox, Name: 167:def load_settings():
+Role: InlineTextBox, Name: 190:        debug_log(f"Settings load FAILED ({e}), using defaults")
+Role: InlineTextBox, Name: 193:def save_settings(enabled, scan_delay=100, click_delay=150, preset
+Role: InlineTextBox, Name: 248:def start_agentic_bridge():
+Role: InlineTextBox, Name: 251:        def log_message(self, format, *args): pass
+Role: InlineTextBox, Name: 252:        def do_POST(self):
+Role: InlineTextBox, Name: 270:        def do_GET(self):
+Role: InlineTextBox, Name: 298:def cleanup_old_processes():
+Role: InlineTextBox, Name: 392:async def get_targets_async():
+Role: InlineTextBox, Name: 394:    async def probe(port):
+Role: InlineTextBox, Name: 422:async def _cdp_eval(ws_url, js_code):
+Role: InlineTextBox, Name: 439:    def __init__(self):
+Role: InlineTextBox, Name: 474:        # Use saved position if available, otherwise default to bo
+Role: InlineTextBox, Name: 495:        self.ui_status.tag_configure('default', foreground='#e6edf
+Role: InlineTextBox, Name: 3')
+Role: InlineTextBox, Name: 577:    def _fetch_quota_worker(self):
+Role: InlineTextBox, Name: 579:        ctx = ssl.create_default_context()
+Role: InlineTextBox, Name: 627:                                    model_color = 'default'
+Role: InlineTextBox, Name: 693:    def _start_drag(self, e):
+Role: InlineTextBox, Name: 699:    def _on_drag(self, e):
+Role: InlineTextBox, Name: 706:    def _end_drag(self, e):
+Role: InlineTextBox, Name: 716:    def on_close(self):
+Role: InlineTextBox, Name: 721:        def _force_exit():
+Role: InlineTextBox, Name: 728:    def prompt_restart(self):
+Role: InlineTextBox, Name: 742:    def restart_clicker(self):
+Role: InlineTextBox, Name: 781:    def show_toast(self, text, color='#a78bfa', on_click=None):
+Role: InlineTextBox, Name: 785:    def focus_ide(self):
+Role: InlineTextBox, Name: 796:            def enum_cb(hwnd, lparam):
+Role: InlineTextBox, Name: 815:    def restart_antigravity(self):
+Role: InlineTextBox, Name: 914:    def toggle_overlay(self):
+Role: InlineTextBox, Name: 919:    def toggle_highlight(self):
+Role: InlineTextBox, Name: 924:    def toggle_scroll(self):
+Role: InlineTextBox, Name: 934:    def toggle_play(self):
+Role: InlineTextBox, Name: 947:    def _save_all(self):
+Role: InlineTextBox, Name: 956:    def _register_global_hotkey(self):
+Role: InlineTextBox, Name: 960:        def _hotkey_listener():
+Role: InlineTextBox, Name: 987:    def _play_idle_alert(self):
+Role: InlineTextBox, Name: 990:        def _beep():
+Role: InlineTextBox, Name: 1003:    def toggle_auto_start(self):
+Role: InlineTextBox, Name: 1046:    def toggle_settings(self):
+Role: InlineTextBox, Name: 1052:    def close_drawer(self):
+Role: InlineTextBox, Name: 1062:    def open_drawer(self):
+Role: InlineTextBox, Name: 1298:    def toggle_pref_allow(self):
+Role: InlineTextBox, Name: 1309:    def _save_delays(self):
+Role: InlineTextBox, Name: 1341:    def click_toggle(self, kw):
+Role: InlineTextBox, Name: 1351:    def flash_click(self):
+Role: InlineTextBox, Name: 1354:    def restart_ide(self):
+Role: InlineTextBox, Name: 1355:        def _bg():
+Role: InlineTextBox, Name: 1379:    def reset_clicks(self):
+Role: InlineTextBox, Name: 1383:    def open_log_window(self):
+Role: InlineTextBox, Name: 1407:    def add_log(self, msg):
+Role: InlineTextBox, Name: 1420:    def _append_log_text(self, text):
+Role: InlineTextBox, Name: 1429:    def open_preset_dropdown(self):
+Role: InlineTextBox, Name: 1457:    def close_preset_popup(self):
+Role: InlineTextBox, Name: 1466:    def apply_preset(self, name):
+Role: InlineTextBox, Name: 1481:    def refresh_ui(self):
+Role: InlineTextBox, Name: 1551:    def worker_loop(self):
+Role: InlineTextBox, Name: 1559:    async def async_worker_loop(self):
+Role: InlineTextBox, Name: 1585:                targets = await get_targets_async()
+Role: InlineTextBox, Name: 1732:                                    def rank(t):
+Role: InlineTextBox, Name: 1870:    def run(self):
+Role: InlineTextBox, Name: 1902:    def __global_exception_handler(exctype, value, tb):
+Role: InlineTextBox, Name: 1 file
+Role: InlineTextBox, Name: 25, in run_until_complete
+Role: StaticText, Name: 1
+Role: StaticText, Name: 2
+Role: StaticText, Name: 3
+Role: StaticText, Name: 4
+Role: StaticText, Name: 5
+Role: StaticText, Name: 6
+Role: StaticText, Name: 1
+Role: StaticText, Name: 7
+Role: StaticText, Name: 8
+Role: StaticText, Name: 9
+Role: StaticText, Name: 10
+Role: StaticText, Name: 11
+Role: StaticText, Name: 12
+Role: StaticText, Name: '127.0.0.1'
+Role: StaticText, Name: 13
+Role: StaticText, Name: 14
+Role: StaticText, Name: 15
+Role: StaticText, Name: 16
+Role: StaticText, Name: 17
+Role: StaticText, Name: 1
+Role: StaticText, Name: 18
+Role: StaticText, Name: 19
+Role: StaticText, Name: 20
+Role: StaticText, Name: 21
+Role: StaticText, Name: 22
+Role: StaticText, Name: 23
+Role: StaticText, Name: 24
+Role: StaticText, Name: 25
+Role: StaticText, Name: 26
+Role: StaticText, Name: 27
+Role: StaticText, Name: 28
+Role: StaticText, Name: 29
+Role: StaticText, Name: 30
+Role: StaticText, Name: 31
+Role: StaticText, Name: 32
+Role: InlineTextBox, Name: 1
+Role: InlineTextBox, Name: 2
+Role: InlineTextBox, Name: 3
+Role: InlineTextBox, Name: 4
+Role: InlineTextBox, Name: 5
+Role: InlineTextBox, Name: 6
+Role: InlineTextBox, Name: 1
+Role: InlineTextBox, Name: 7
+Role: InlineTextBox, Name: 8
+Role: InlineTextBox, Name: 9
+Role: InlineTextBox, Name: 10
+Role: InlineTextBox, Name: 11
+Role: InlineTextBox, Name: 12
+Role: InlineTextBox, Name: '127.0.0.1'
+Role: InlineTextBox, Name: 13
+Role: InlineTextBox, Name: 14
+Role: InlineTextBox, Name: 15
+Role: InlineTextBox, Name: 16
+Role: InlineTextBox, Name: 17
+Role: InlineTextBox, Name: 1
+Role: InlineTextBox, Name: 18
+Role: InlineTextBox, Name: 19
+Role: InlineTextBox, Name: 20
+Role: InlineTextBox, Name: 21
+Role: InlineTextBox, Name: 22
+Role: InlineTextBox, Name: 23
+Role: InlineTextBox, Name: 24
+Role: InlineTextBox, Name: 25
+Role: InlineTextBox, Name: 26
+Role: InlineTextBox, Name: 27
+Role: InlineTextBox, Name: 28
+Role: InlineTextBox, Name: 29
+Role: InlineTextBox, Name: 30
+Role: InlineTextBox, Name: 31
+Role: InlineTextBox, Name: 32
