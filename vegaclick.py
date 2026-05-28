@@ -488,11 +488,11 @@ class VegaClickApp:
         self.settings_btn.bind('<Button-1>', lambda e: self.toggle_settings())
         Tooltip(self.settings_btn, 'Open settings drawer')
 
-        self.ui_status = tk.Text(self.root, height=1, width=22, font=("Consolas", 9),
+        self.ui_status = tk.Text(self.root, height=1, width=14, font=("Consolas", 9),
                                   bg='#0e1117', relief='flat', bd=0,
                                   highlightthickness=0, state='disabled',
                                   cursor='arrow', takefocus=0)
-        self.ui_status.pack(side='left', padx=(0,4), pady=4)
+        self.ui_status.pack(side='left', padx=(0,2), pady=4)
         self.ui_status.tag_configure('green', foreground='#22c55e')
         self.ui_status.tag_configure('amber', foreground='#f59e0b')
         self.ui_status.tag_configure('blue', foreground='#00d4ff')
@@ -647,17 +647,23 @@ class VegaClickApp:
                                     if name in seen_names: continue
                                     seen_names.add(name)
                                     
-                                    frac = q.get('remainingFraction', 1.0)
+                                    if 'premium' in q:
+                                        frac = q['premium'].get('remainingFraction', 0.0 if 'resetTime' in q['premium'] else 1.0)
+                                        reset = q['premium'].get('resetTime', '')
+                                    else:
+                                        frac = q.get('remainingFraction', 0.0 if 'resetTime' in q else 1.0)
+                                        reset = q.get('resetTime', '')
+                                        
                                     pct = int(frac * 100)
                                     pct_color = 'high' if pct >= 80 else 'med' if pct >= 40 else 'low'
                                     
-                                    rst = q.get('resetTime', '')
                                     # Calculate countdown to reset
                                     countdown = ''
-                                    if rst and 'T' in rst:
+                                    if reset and 'T' in reset:
                                         try:
                                             # datetime imported at module level
-                                            reset_dt = datetime.fromisoformat(rst.replace('Z', '+00:00'))
+                                            from datetime import datetime, timezone
+                                            reset_dt = datetime.fromisoformat(reset.replace('Z', '+00:00'))
                                             now = datetime.now(timezone.utc)
                                             delta = reset_dt - now
                                             total_secs = max(0, int(delta.total_seconds()))
@@ -672,7 +678,7 @@ class VegaClickApp:
                                         except Exception:
                                             countdown = ''
                                     
-                                    st = rst.replace('T', ' ').replace('Z', ' UTC') if 'T' in rst else (rst or 'N/A')
+                                    st = reset.replace('T', ' ').replace('Z', ' UTC') if reset and 'T' in reset else (reset or 'N/A')
                                     tooltip_text = f"{friendly}\nRemaining: {pct}%"
                                     if countdown:
                                         tooltip_text += f"\nResets in: {countdown}"
