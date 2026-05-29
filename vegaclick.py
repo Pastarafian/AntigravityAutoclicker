@@ -181,6 +181,7 @@ def load_settings():
             click_delay = data.get('click_delay', 150)
             preset = data.get('preset', 'All')
             typing_delay = data.get('typing_delay', 5)
+            tab_delay = data.get('tab_delay', 15)
             scroll_delay = data.get('scroll_delay', 15)
             cb_clicks = data.get('cb_clicks', 3)
             cb_seconds = data.get('cb_seconds', 20)
@@ -191,17 +192,17 @@ def load_settings():
             pref_allow = data.get('pref_allow', 'allow in workspace')
             enabled_count = sum(1 for v in enabled.values() if v)
             debug_log(f"Settings loaded: preset={preset} scan={scan_delay}ms click={click_delay}ms typing={typing_delay}s scroll={scroll_delay}s cb={cb_clicks}/{cb_seconds}s idle={idle_alert_minutes}min autostart={auto_start} pref_allow={pref_allow} enabled_kw={enabled_count}/{len(enabled)} pill=({pill_x},{pill_y})")
-            return enabled, scan_delay, click_delay, preset, typing_delay, scroll_delay, cb_clicks, cb_seconds, pill_x, pill_y, idle_alert_minutes, auto_start, pref_allow
+            return enabled, scan_delay, click_delay, preset, typing_delay, scroll_delay, tab_delay, cb_clicks, cb_seconds, pill_x, pill_y, idle_alert_minutes, auto_start, pref_allow
     except Exception as e:
         debug_log(f"Settings load FAILED ({e}), using defaults")
         return {kw: True for kw, _, _, _, _ in KEYWORDS}, 100, 150, 'All', 5, 15, 3, 20, None, None, 5, False, 'allow in workspace'
 
-def save_settings(enabled, scan_delay=100, click_delay=150, preset='All', typing_delay=5, scroll_delay=15,
+def save_settings(enabled, scan_delay=100, click_delay=150, preset='All', typing_delay=5, scroll_delay=15, tab_delay=15,
                   cb_clicks=3, cb_seconds=20, pill_x=None, pill_y=None, idle_alert_minutes=5, auto_start=False, pref_allow='allow in workspace'):
     try:
         data = {
             'enabled': enabled, 'scan_delay': scan_delay, 'click_delay': click_delay,
-            'preset': preset, 'typing_delay': typing_delay, 'scroll_delay': scroll_delay,
+            'preset': preset, 'typing_delay': typing_delay, 'scroll_delay': scroll_delay, 'tab_delay': tab_delay,
             'cb_clicks': cb_clicks, 'cb_seconds': cb_seconds,
             'idle_alert_minutes': idle_alert_minutes, 'auto_start': auto_start,
             'pref_allow': pref_allow,
@@ -460,7 +461,7 @@ class VegaClickApp:
         self.pages_connected = 0
         self.scan_targets = 0
         self.search_ticks = 0
-        self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay, self.cb_clicks, self.cb_seconds, self.pill_x, self.pill_y, self.idle_alert_minutes, self.auto_start, self.pref_allow = load_settings()
+        self.enabled, self.scan_delay, self.click_delay, self.preset, self.typing_delay, self.scroll_delay, self.tab_delay, self.cb_clicks, self.cb_seconds, self.pill_x, self.pill_y, self.idle_alert_minutes, self.auto_start, self.pref_allow = load_settings()
         debug_log(f"UI pill geometry: 530x30 at ({self.pill_x},{self.pill_y}), screen=({self.root.winfo_screenwidth()}x{self.root.winfo_screenheight()})")
         self.drawer = None
         self.toggle_labels = {}
@@ -974,10 +975,10 @@ class VegaClickApp:
 
     def _save_all(self):
         """Convenience: save all current settings to disk."""
-        debug_log(f"_save_all: preset={self.preset} scan={self.scan_delay} click={self.click_delay} typing={self.typing_delay} scroll={self.scroll_delay} cb={self.cb_clicks}/{self.cb_seconds} idle={self.idle_alert_minutes}min")
+        debug_log(f"_save_all: preset={self.preset} scan={self.scan_delay} click={self.click_delay} typing={self.typing_delay} scroll={self.scroll_delay} tab={self.tab_delay} cb={self.cb_clicks}/{self.cb_seconds} idle={self.idle_alert_minutes}min")
         save_settings(
             self.enabled, self.scan_delay, self.click_delay, self.preset,
-            self.typing_delay, self.scroll_delay, self.cb_clicks, self.cb_seconds,
+            self.typing_delay, self.scroll_delay, self.tab_delay, self.cb_clicks, self.cb_seconds,
             self.pill_x, self.pill_y, self.idle_alert_minutes, self.auto_start, self.pref_allow
         )
 
@@ -1197,12 +1198,25 @@ class VegaClickApp:
                                     bg='#1c2128', fg='#e6edf3', insertbackground='#e6edf3',
                                     relief='flat', bd=0, highlightthickness=0)
         self.typing_entry.insert(0, str(self.typing_delay))
+
         self.typing_entry.pack(side='left')
         tk.Label(typing_cell, text="s", font=("Consolas", 8),
                  fg='#64748b', bg='#1c2128').pack(side='left', padx=(0,4))
 
+        tab_cell = tk.Frame(grid, bg='#1c2128')
+        tab_cell.grid(row=base_row + 1, column=1, padx=3, pady=2, sticky='ew')
+        tk.Label(tab_cell, text="Tab:", font=("Segoe UI", 8, "bold"),
+                 fg='#00d4ff', bg='#1c2128').pack(side='left', padx=(4,2))
+        self.tab_entry = tk.Entry(tab_cell, width=3, font=("Segoe UI", 8, "bold"),
+                                    bg='#1c2128', fg='#e6edf3', insertbackground='#e6edf3',
+                                    relief='flat', bd=0, highlightthickness=0)
+        self.tab_entry.insert(0, str(self.tab_delay))
+        self.tab_entry.pack(side='left')
+        tk.Label(tab_cell, text="s", font=("Consolas", 8),
+                 fg='#64748b', bg='#1c2128').pack(side='left', padx=(0,4))
+
         idle_cell = tk.Frame(grid, bg='#1c2128')
-        idle_cell.grid(row=base_row + 1, column=1, padx=3, pady=2, sticky='ew')
+        idle_cell.grid(row=base_row + 1, column=2, padx=3, pady=2, sticky='ew')
         idle_lbl = tk.Label(idle_cell, text="Idle:", font=("Segoe UI", 8, "bold"),
                  fg='#f59e0b', bg='#1c2128')
         idle_lbl.pack(side='left', padx=(4,2))
@@ -1254,6 +1268,7 @@ class VegaClickApp:
 
 
         self.typing_entry.bind('<KeyRelease>', lambda e: self._save_delays())
+        self.tab_entry.bind('<KeyRelease>', lambda e: self._save_delays())
         self.scroll_entry.bind('<KeyRelease>', lambda e: self._save_delays())
         self.scan_entry.bind('<KeyRelease>', lambda e: self._save_delays())
         self.click_entry.bind('<KeyRelease>', lambda e: self._save_delays())
@@ -1345,6 +1360,7 @@ class VegaClickApp:
             pass
         try:
             self.typing_delay = max(0, int(self.typing_entry.get()))
+            self.tab_delay = max(0, int(self.tab_entry.get()))
         except ValueError:
             pass
         try:
@@ -1647,6 +1663,16 @@ class VegaClickApp:
                                     ws = await websockets.connect(ws_url, max_size=10_000_000, close_timeout=1)
                                     await ws.send(json.dumps({"id": 1, "method": "DOM.enable"}))
                                     await ws.send(json.dumps({"id": 2, "method": "Accessibility.enable"}))
+
+                                    tracker_js = '''(function(){
+                                        if(window._vc_tracker) return;
+                                        window._vc_tracker = { type:0, scroll:0, click:0 };
+                                        document.addEventListener('keydown', e => { if(e.isTrusted && (e.key.length===1||e.key==='Backspace'||e.key==='Enter')) window._vc_tracker.type = Date.now(); }, true);
+                                        document.addEventListener('wheel', e => { if(e.isTrusted) window._vc_tracker.scroll = Date.now(); }, true);
+                                        document.addEventListener('touchmove', e => { if(e.isTrusted) window._vc_tracker.scroll = Date.now(); }, true);
+                                        document.addEventListener('mousedown', e => { if(e.isTrusted) window._vc_tracker.click = Date.now(); }, true);
+                                    })()'''
+                                    await ws.send(json.dumps({"id": 4, "method": "Runtime.evaluate", "params": {"expression": tracker_js}}))
                                     
                                     await ws.send(json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": "!!document.querySelector('.monaco-workbench')", "returnByValue": True}}))
                                     is_ide = False
@@ -1668,6 +1694,18 @@ class VegaClickApp:
                             ws = active_connections[ws_url]
                             
                             try:
+                                # Tracker query
+                                tracker_query = '''(function(){
+                                    if(!window._vc_tracker) return {type:0, scroll:0, click:0};
+                                    var n = Date.now();
+                                    return {
+                                        type: n - window._vc_tracker.type,
+                                        scroll: n - window._vc_tracker.scroll,
+                                        click: n - window._vc_tracker.click
+                                    };
+                                })()'''
+                                await ws.send(json.dumps({"id": 98, "method": "Runtime.evaluate", "params": {"expression": tracker_query, "returnByValue": True}}))
+
                                 # Auto scroll
                                 if not self.scroll_paused:
                                     await ws.send(json.dumps({"id": 5, "method": "Runtime.evaluate", "params": {"expression": auto_scroll_js}}))
@@ -1820,6 +1858,18 @@ class VegaClickApp:
                                             else:
                                                 clicked_dot = res_val
                                             
+                                        if data.get("id") == 98:
+                                            res_val = data.get("result", {}).get("result", {}).get("value")
+                                            if res_val:
+                                                t_left = max(0, self.typing_delay - res_val.get('type', 9999999)/1000.0)
+                                                s_left = max(0, self.scroll_delay - res_val.get('scroll', 9999999)/1000.0)
+                                                c_left = max(0, self.tab_delay - res_val.get('click', 9999999)/1000.0)
+                                                user_wait = max(t_left, s_left, c_left)
+                                                if user_wait > 0:
+                                                    user_cooldown = user_wait * 1000
+                                                    if user_cooldown > max_cd:
+                                                        max_cd = user_cooldown
+
                                         if data.get("id") == 101:
                                             res_val = data.get("result", {}).get("result", {}).get("value")
                                             if res_val:
