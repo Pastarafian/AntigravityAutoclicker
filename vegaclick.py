@@ -2133,14 +2133,20 @@ class VegaClickApp:
                                                     
                                                     if target['kw'] in COUNTABLE_ACTIONS:
                                                         self.total_clicks += 1
-                                                        if self.cb_clicks > 0 and self.total_clicks >= self.cb_clicks:
+                                                        
+                                                        now = time.time()
+                                                        if not hasattr(self, '_cb_log'): self._cb_log = []
+                                                        self._cb_log = [t for t in self._cb_log if now - t < getattr(self, 'cb_seconds', 20)]
+                                                        self._cb_log.append(now)
+                                                        
+                                                        if self.cb_clicks > 0 and len(self._cb_log) > self.cb_clicks:
                                                             # Tripped circuit breaker
-                                                            self.total_clicks = 0
+                                                            self._cb_log = []
                                                             
                                                             def trigger_cb():
                                                                 self.toggle_play(force=False)
-                                                                if self.tray_icon and getattr(self, 'play_active', False):
-                                                                    self.tray_icon.notify(f"Paused after {self.cb_clicks} clicks", "VegaClick Auto-Pause")
+                                                                if getattr(self, 'tray_icon', None) and getattr(self, 'play_active', False):
+                                                                    self.tray_icon.notify(f"Paused: {self.cb_clicks} clicks in {getattr(self, 'cb_seconds', 20)}s", "VegaClick Auto-Pause")
                                                                     self.icon_state = "paused"
                                                                     self.update_tray_icon()
                                                             self.master.after(0, trigger_cb)
