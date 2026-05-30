@@ -201,7 +201,7 @@ def load_settings():
             typing_delay = data.get('typing_delay', 5)
             tab_delay = data.get('tab_delay', 15)
             scroll_delay = data.get('scroll_delay', 15)
-            cb_clicks = data.get('cb_clicks', 3)
+            cb_clicks = data.get('cb_clicks', 10)
             cb_seconds = data.get('cb_seconds', 20)
             pill_x = data.get('pill_x', None)
             pill_y = data.get('pill_y', None)
@@ -216,7 +216,7 @@ def load_settings():
         return {kw: True for kw, _, _, _, _ in KEYWORDS}, 100, 150, 'All', 5, 15, 3, 20, None, None, 5, False, 'allow in workspace'
 
 def save_settings(enabled, scan_delay=100, click_delay=150, preset='All', typing_delay=5, scroll_delay=15, tab_delay=15,
-                  cb_clicks=3, cb_seconds=20, pill_x=None, pill_y=None, idle_alert_minutes=5, auto_start=False, pref_allow='allow in workspace'):
+                  cb_clicks=10, cb_seconds=20, pill_x=None, pill_y=None, idle_alert_minutes=5, auto_start=False, pref_allow='allow in workspace'):
     try:
         data = {
             'enabled': enabled, 'scan_delay': scan_delay, 'click_delay': click_delay,
@@ -2085,12 +2085,12 @@ class VegaClickApp:
                                             
                                         js_click = """function() {
                                             var node = this.nodeType === 3 ? this.parentElement : this;
+                                            var btn = node.closest('button, [role="button"], vscode-button, vscode-radio, vscode-checkbox, a') || node;
                                             var isSubagent = ('__KW__' === 'needs attention');
                                             var isSubmit = ('__KW__' === 'submit');
                                             if (!node.getBoundingClientRect) return {s: "hidden"};
                                             var r = node.getBoundingClientRect();
                                             if (r.width === 0 && r.height === 0) return {s: "hidden"};
-                                            var btn = node.closest('button, [role="button"], vscode-button, a') || node;
                                             if (btn.disabled || btn.getAttribute('aria-disabled') === 'true' || window.getComputedStyle(btn).pointerEvents === 'none') return {s: "disabled"};
                                             if (!isSubagent && node.closest('.left-sidebar, aside, .sidebar, .part.sidebar')) return {s: "sidebar"};
                                             if (!isSubagent && !isSubmit && node.closest('.chat-input, .composer, .input-area, .bottom-bar, [data-testid="composer"], form')) return {s: "composer"};
@@ -2107,6 +2107,13 @@ class VegaClickApp:
                                             node.dispatchEvent(down);
                                             node.dispatchEvent(up);
                                             node.dispatchEvent(click);
+                                            
+                                            if (btn !== node) {
+                                                btn.dispatchEvent(down);
+                                                btn.dispatchEvent(up);
+                                                btn.dispatchEvent(click);
+                                            }
+                                            
                                             if(typeof node.click === 'function') { node.click(); }
                                             if(typeof btn.click === 'function') { btn.click(); }
                                             
