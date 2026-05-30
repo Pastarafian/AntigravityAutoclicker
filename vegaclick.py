@@ -2058,8 +2058,10 @@ class VegaClickApp:
                                         if is_tab_switch and getattr(self, 'tab_cooldown', 0) > 0:
                                             continue
                                             
+                                        node_key = f"{target['kw']}_{target['name']}"
+                                        
                                         if hasattr(self, 'processed_nodes'):
-                                            if target["id"] in self.processed_nodes and time.time() < self.processed_nodes[target["id"]]:
+                                            if node_key in self.processed_nodes and time.time() < self.processed_nodes[node_key]:
                                                 continue
                                         await ws.send(json.dumps({
                                             "id": 104,
@@ -2102,9 +2104,10 @@ class VegaClickApp:
                                             var up = new MouseEvent('mouseup', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
                                             var click = new MouseEvent('click', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
                                             
-                                            btn.dispatchEvent(down);
-                                            btn.dispatchEvent(up);
-                                            btn.dispatchEvent(click);
+                                            node.dispatchEvent(down);
+                                            node.dispatchEvent(up);
+                                            node.dispatchEvent(click);
+                                            if(typeof node.click === 'function') { node.click(); }
                                             if(typeof btn.click === 'function') { btn.click(); }
                                             
                                             return {s: "clicked", x: x, y: y};
@@ -2157,7 +2160,7 @@ class VegaClickApp:
                                             continue
                                             
                                         if hasattr(self, 'processed_nodes'):
-                                            self.processed_nodes[target["id"]] = time.time() + 2.0
+                                            self.processed_nodes[node_key] = time.time() + 2.0
                                             
                                         x, y = click_res.get("x", 0), click_res.get("y", 0)
                                         
