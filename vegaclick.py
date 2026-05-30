@@ -1907,8 +1907,7 @@ class VegaClickApp:
                                         if data.get("id") == 98:
                                             res_val = data.get("result", {}).get("result", {}).get("value")
                                             if res_val:
-                                                os_idle = get_os_idle_time()
-                                                t_left = max(0, self.typing_delay - min(res_val.get('type', 9999999)/1000.0, os_idle))
+                                                t_left = max(0, self.typing_delay - res_val.get('type', 9999999)/1000.0)
                                                 s_left = max(0, self.scroll_delay - res_val.get('scroll', 9999999)/1000.0)
                                                 c_left = max(0, self.tab_delay - res_val.get('click', 9999999)/1000.0)
                                                 user_wait = max(t_left, s_left, c_left)
@@ -2089,7 +2088,8 @@ class VegaClickApp:
                                             if (!node.getBoundingClientRect) return {s: "hidden"};
                                             var r = node.getBoundingClientRect();
                                             if (r.width === 0 && r.height === 0) return {s: "hidden"};
-                                            if (node.disabled || node.getAttribute('aria-disabled') === 'true' || window.getComputedStyle(node).pointerEvents === 'none') return {s: "disabled"};
+                                            var btn = node.closest('button, [role="button"], vscode-button, a') || node;
+                                            if (btn.disabled || btn.getAttribute('aria-disabled') === 'true' || window.getComputedStyle(btn).pointerEvents === 'none') return {s: "disabled"};
                                             if (!isSubagent && node.closest('.left-sidebar, aside, .sidebar, .part.sidebar')) return {s: "sidebar"};
                                             if (!isSubagent && !isSubmit && node.closest('.chat-input, .composer, .input-area, .bottom-bar, [data-testid="composer"], form')) return {s: "composer"};
                                             node.scrollIntoView({block: 'center'});
@@ -2102,10 +2102,10 @@ class VegaClickApp:
                                             var up = new MouseEvent('mouseup', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
                                             var click = new MouseEvent('click', {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window});
                                             
-                                            node.dispatchEvent(down);
-                                            node.dispatchEvent(up);
-                                            node.dispatchEvent(click);
-                                            if(typeof node.click === 'function') { node.click(); }
+                                            btn.dispatchEvent(down);
+                                            btn.dispatchEvent(up);
+                                            btn.dispatchEvent(click);
+                                            if(typeof btn.click === 'function') { btn.click(); }
                                             
                                             return {s: "clicked", x: x, y: y};
                                         }""".replace('__KW__', target['kw'])
