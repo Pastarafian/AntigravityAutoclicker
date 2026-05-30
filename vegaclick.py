@@ -1907,7 +1907,7 @@ class VegaClickApp:
                                 blocklist = ['delete','remove','uninstall','format','reset','sign out','log out','close','discard','reject','deny','dismiss','erase','drop','run and debug','go back','go forward','more actions','always run','running','runner','run extension','run_cli','rescue run','rescue','allowlist','restart','reload','rules','mcp','feedback','star','scheduled tasks', '.md', '.py', '.js', '.json', '.html']
                                 
                                 if not hasattr(self, 'processed_nodes'):
-                                    self.processed_nodes = set()
+                                    self.processed_nodes = {}
                                     
                                 current_number = None
                                 nodes_since_number = 0
@@ -1956,7 +1956,8 @@ class VegaClickApp:
                                             
                                         if kw_match and (kw_match == 'submit' or self.enabled.get(kw_match, True)):
                                             if hasattr(self, 'processed_nodes') and node_id in self.processed_nodes:
-                                                continue
+                                                if time.time() < self.processed_nodes[node_id]:
+                                                    continue
                                                 
                                             if kw_match == 'allow' and hasattr(self, 'pref_allow'):
                                                 clean_name = re.sub(r'^[\[\]\(\)\s\d\.]+', '', name_lower).strip()
@@ -2017,9 +2018,8 @@ class VegaClickApp:
                                     actionable.sort(key=rank, reverse=True)
                                     for target in actionable:
                                         if hasattr(self, 'processed_nodes'):
-                                            if target["id"] in self.processed_nodes:
+                                            if target["id"] in self.processed_nodes and time.time() < self.processed_nodes[target["id"]]:
                                                 continue
-                                            self.processed_nodes.add(target["id"])
                                         await ws.send(json.dumps({
                                             "id": 104,
                                             "method": "DOM.resolveNode",
@@ -2047,6 +2047,7 @@ class VegaClickApp:
                                             if (!node.getBoundingClientRect) return {s: "hidden"};
                                             var r = node.getBoundingClientRect();
                                             if (r.width === 0 && r.height === 0) return {s: "hidden"};
+                                            if (node.disabled || node.getAttribute('aria-disabled') === 'true' || window.getComputedStyle(node).pointerEvents === 'none') return {s: "disabled"};
                                             if (!isSubagent && node.closest('.left-sidebar, aside, .sidebar, .part.sidebar')) return {s: "sidebar"};
                                             if (!isSubagent && !isSubmit && node.closest('.chat-input, .composer, .input-area, .bottom-bar, [data-testid="composer"], form')) return {s: "composer"};
                                             node.scrollIntoView({block: 'center'});
@@ -2112,6 +2113,9 @@ class VegaClickApp:
                                             self.last_msg = f"Ignored {target['kw']} ({click_res.get('s') if click_res else 'timeout'})"
                                             self.root.after(0, lambda msg=self.last_msg: self.add_log(msg))
                                             continue
+                                            
+                                        if hasattr(self, 'processed_nodes'):
+                                            self.processed_nodes[target["id"]] = time.time() + 2.0
                                             
                                         x, y = click_res.get("x", 0), click_res.get("y", 0)
                                         
