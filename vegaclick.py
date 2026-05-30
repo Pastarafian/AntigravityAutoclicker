@@ -1652,6 +1652,7 @@ class VegaClickApp:
                     self.search_ticks = 0
                     a_count = 0; w_count = 0; c_count = 0
                     max_cd = 0
+                    max_tab_cd = 0
 
                     if self.active:
                         for p in pages:
@@ -1730,7 +1731,7 @@ class VegaClickApp:
                                 })()"""
                                 await ws.send(json.dumps({"id": 99, "method": "Runtime.evaluate", "params": {"expression": bounds_js, "returnByValue": True}}))
                                 
-                                if getattr(self, 'switcher_on', False) and getattr(self, 'cooldown', 0) <= 0:
+                                if getattr(self, 'switcher_on', False) and getattr(self, 'tab_cooldown', 0) <= 0:
                                     blue_dot_js = """(function(){
                                         try {
                                             var els = document.querySelectorAll('*');
@@ -1873,6 +1874,12 @@ class VegaClickApp:
                                                     user_cooldown = user_wait * 1000
                                                     if user_cooldown > max_cd:
                                                         max_cd = user_cooldown
+                                                
+                                                tab_wait = max(t_left, c_left)
+                                                if tab_wait > 0:
+                                                    t_cd = tab_wait * 1000
+                                                    if t_cd > max_tab_cd:
+                                                        max_tab_cd = t_cd
 
                                         if data.get("id") == 101:
                                             res_val = data.get("result", {}).get("result", {}).get("value")
@@ -2139,6 +2146,7 @@ class VegaClickApp:
                                 pass
 
                         self.cooldown = max_cd
+                        self.tab_cooldown = max_tab_cd
                         self._pages_total = len(pages)
                         self._page_states = (a_count, w_count, c_count)
                         
