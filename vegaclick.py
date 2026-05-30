@@ -1730,7 +1730,7 @@ class VegaClickApp:
                                 })()"""
                                 await ws.send(json.dumps({"id": 99, "method": "Runtime.evaluate", "params": {"expression": bounds_js, "returnByValue": True}}))
                                 
-                                if getattr(self, 'switcher_on', False):
+                                if getattr(self, 'switcher_on', False) and getattr(self, 'cooldown', 0) <= 0:
                                     blue_dot_js = """(function(){
                                         try {
                                             var els = document.querySelectorAll('*');
@@ -1969,7 +1969,7 @@ class VegaClickApp:
                                     if hasattr(self, 'processed_nodes'):
                                         self.processed_nodes.clear()
 
-                                if actionable:
+                                if actionable and getattr(self, 'cooldown', 0) <= 0:
                                     def rank(t):
                                         if t['kw'] == 'submit': return 1
                                         
